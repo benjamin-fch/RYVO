@@ -1,0 +1,933 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
+<title>RYVO Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+:root{
+  /* Layout: RYVO's sticker identity turned into an operations console. Ink rail, paper ground, dense tables, colour only where something needs a decision. Single light theme. */
+  color-scheme:light;
+  --paper:#FBF8F3; --wash:#F3EEE6; --card:#FFFFFF; --ink:#17142A; --ink2:#4A4560; --mute:#7C7792; --line:#E8E2D8; --line2:#D3CCBF;
+  --brand:#5B4BFF; --brand-soft:#ECEAFF; --sun:#FFC93C; --sun-soft:#FFF4CC; --hot:#FF6B3D;
+  --good:#0E9F64; --good-soft:#DDF5EA; --warn:#B45309; --warn-soft:#FFEDD5; --bad:#E5364B; --bad-soft:#FDE3E6;
+  --c-sprint:#3D7BFF; --c-reflex:#FF6B3D; --c-brain:#8B5CF6; --c-cards:#FFB800; --c-stack:#FF4FA0; --c-grid:#14B37A; --c-words:#00A6C8; --c-aim:#F23F55;
+  --f-d:'Bricolage Grotesque',ui-rounded,system-ui,sans-serif;
+  --f-b:'Onest',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-m:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--paper);color:var(--ink);font:400 14px/1.5 var(--f-b);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:6px}
+#main:focus{outline:none}
+h1,h2,h3{font-family:var(--f-d);margin:0;text-wrap:balance;line-height:1.1}
+h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:17px;font-weight:800}
+h3{font-size:14px;font-weight:700}
+p{margin:0}
+ul,ol{margin:0;padding:0;list-style:none}
+.mono{font-family:var(--f-m);font-variant-numeric:tabular-nums}
+.tiny{font-size:12px;color:var(--ink2)}
+.mute{color:var(--mute)}
+.eyebrow{font:700 10.5px/1.3 var(--f-m);letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.ic{flex:none}
+
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+#rail{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--ink);color:#fff;padding:18px 12px;display:flex;flex-direction:column;gap:18px}
+.logo{display:flex;align-items:center;gap:10px;padding:0 6px;font:800 21px/1 var(--f-d);letter-spacing:-.01em}
+.logo small{display:block;font:700 9px/1 var(--f-m);letter-spacing:.14em;color:var(--sun);margin-top:4px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav .grp{font:700 9.5px/1 var(--f-m);letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45);padding:12px 10px 6px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:10px;border:0;background:none;color:rgba(255,255,255,.78);font-weight:600;cursor:pointer;text-align:left}
+.nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav button[aria-current="page"]{background:#fff;color:var(--ink)}
+.nav button .cnt{margin-left:auto;min-width:22px;height:20px;padding:0 6px;border-radius:99px;background:var(--hot);color:#fff;font:700 10.5px/20px var(--f-m);text-align:center}
+.nav button .lk{margin-left:auto;opacity:.6}
+.nav button[disabled]{opacity:.45;cursor:not-allowed}
+.rail-foot{margin-top:auto;font-size:11.5px;color:rgba(255,255,255,.6);line-height:1.45;padding:0 6px}
+main{min-width:0;padding-inline:28px;padding-block:0 60px}
+#top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;gap:10px;padding-block:12px;background:linear-gradient(var(--paper) 78%,transparent)}
+#top .grow{flex:1}
+.demo-band{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;border:2px dashed #E3B341;background:#FFF9E6;font-size:12.5px;color:#7A4E00;margin-bottom:18px}
+.who{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border:2px solid var(--ink);border-radius:12px;background:var(--card);box-shadow:2px 2px 0 var(--ink)}
+.who .av{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font:800 13px/1 var(--f-d);border:2px solid var(--ink)}
+.who select{border:0;background:none;font-weight:700;cursor:pointer;padding:2px}
+@media (max-width:960px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  #rail{position:sticky;top:0;z-index:30;height:auto;flex-direction:row;align-items:center;padding:10px 12px;gap:12px;overflow-x:auto}
+  #rail .nav{flex-direction:row;gap:4px}
+  #rail .nav .grp,.rail-foot{display:none}
+  #rail .nav button{white-space:nowrap;padding:8px 10px}
+  .logo small{display:none}
+  main{padding-inline:16px}
+  #top{position:static}
+}
+
+.page-h{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:4px 0 18px}
+.page-h p{color:var(--ink2);margin-top:6px;max-width:66ch}
+.page-h>div{min-width:0;max-width:100%}
+.page-h .row{flex-wrap:nowrap}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
+@media (max-width:1200px){.c3,.c4{grid-column:span 6}.c5,.c7,.c8{grid-column:span 12}}
+@media (max-width:720px){.c3,.c4,.c5,.c6,.c7,.c8{grid-column:span 12}}
+.card{background:var(--card);border:1.5px solid var(--line2);border-radius:18px;padding:18px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.card-h .l{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi{padding:14px 16px;border-radius:16px;background:var(--card);border:1.5px solid var(--line2);display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi b{font:800 26px/1.05 var(--f-d);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.kpi small{color:var(--ink2);font-size:12px;font-weight:600}
+.kpi .d{font:700 11.5px/1 var(--f-m);color:var(--mute)}
+.kpi.alert{border:2px solid var(--ink);background:var(--sun-soft);box-shadow:3px 3px 0 var(--ink)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 13px;border-radius:11px;border:2px solid var(--ink);background:var(--card);color:var(--ink);font:700 13px/1 var(--f-b);cursor:pointer;box-shadow:2px 2px 0 var(--ink);white-space:nowrap;transition:transform .08s,box-shadow .08s}
+.btn:hover{background:var(--wash)}
+.btn:active{transform:translate(2px,2px);box-shadow:none}
+.btn.primary{background:var(--brand);color:#fff}
+.btn.sun{background:var(--sun)}
+.btn.danger{background:var(--bad);color:#fff}
+.btn.good{background:var(--good);color:#fff}
+.btn.ghost{border-color:transparent;box-shadow:none;background:transparent}
+.btn.ghost:hover{background:var(--wash)}
+.btn.sm{height:30px;padding:0 10px;font-size:12px;border-radius:9px}
+.btn[disabled]{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.badge{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;font:700 10px/1 var(--f-m);letter-spacing:.04em;text-transform:uppercase;border:1.5px solid var(--line2);color:var(--ink2);background:var(--card);white-space:nowrap}
+.badge.good{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent);background:var(--good-soft)}
+.badge.warn{color:var(--warn);border-color:#F4B37F;background:var(--warn-soft)}
+.badge.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent);background:var(--bad-soft)}
+.badge.brand{color:var(--brand);border-color:color-mix(in srgb,var(--brand) 40%,transparent);background:var(--brand-soft)}
+.badge.ink{background:var(--ink);color:#fff;border-color:var(--ink)}
+.badge.sim{border-style:dashed;color:#8A5A00;border-color:#E3B341;background:#FFF7DD}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.tabs{display:inline-flex;padding:4px;gap:4px;border-radius:13px;background:var(--wash);border:2px solid var(--ink);max-width:100%;overflow-x:auto}
+.tabs button{height:32px;padding:0 12px;border-radius:9px;border:0;background:none;color:var(--ink2);font-weight:700;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabs button .n{margin-left:6px;font:700 10px var(--f-m);opacity:.8}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label,.field .lab{font-weight:700;font-size:12.5px}
+.field .help{font-size:11.5px;color:var(--mute)}
+.field .err{font-size:12px;color:var(--bad);font-weight:600}
+.input{height:38px;padding:0 12px;border-radius:10px;border:2px solid var(--line2);background:var(--card);width:100%;min-width:0}
+textarea.input{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
+textarea.code{font:12px/1.5 var(--f-m);min-height:280px}
+.input:focus{outline:none;border-color:var(--ink);box-shadow:3px 3px 0 var(--brand)}
+.input.bad{border-color:var(--bad)}
+.search{position:relative;flex:1;min-width:200px}
+.search .input{padding-left:34px}
+.search .ic{position:absolute;left:10px;top:10px;color:var(--mute)}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:620px){.fgrid{grid-template-columns:1fr}}
+.fgrid .full{grid-column:1/-1}
+.switch{position:relative;display:inline-block;width:40px;height:24px;flex:none}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.switch i{position:absolute;inset:0;border-radius:99px;background:var(--line2);border:2px solid var(--ink);transition:background .15s}
+.switch i::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid var(--ink);transition:transform .15s}
+.switch input:checked+i{background:var(--good)}
+.switch input:checked+i::after{transform:translateX(16px)}
+.switch input:focus-visible+i{outline:3px solid var(--brand);outline-offset:2px}
+
+.tblw{overflow-x:auto;border:1.5px solid var(--line2);border-radius:14px;background:var(--card)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{position:sticky;top:0;background:var(--wash);text-align:left;font:700 10.5px/1.2 var(--f-m);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);padding:10px 12px;white-space:nowrap;border-bottom:1.5px solid var(--line2)}
+.tbl th button{all:unset;cursor:pointer}
+.tbl th button:hover{color:var(--ink)}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover td{background:#FDFBF7}
+.tbl tr.click{cursor:pointer}
+.tbl td.num,.tbl th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabular-nums}
+.tbl td .sub{display:block;color:var(--mute);font-size:11.5px}
+.tbl td.act{white-space:nowrap;text-align:right}
+.tbl tr.sel td{background:var(--brand-soft)}
+.player{display:flex;align-items:center;gap:10px;min-width:0}
+.pav{width:32px;height:32px;border-radius:10px;border:2px solid var(--ink);display:grid;place-items:center;color:#fff;font:800 13px/1 var(--f-d);flex:none}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding-top:4px}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:28px 16px;border:2px dashed var(--line2);border-radius:16px;color:var(--ink2);background:var(--paper)}
+.empty b{color:var(--ink);font-family:var(--f-d);font-size:15px}
+.queue li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1.5px dashed var(--line)}
+.queue li:first-child{border-top:0;padding-top:0}
+.qico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;border:2px solid var(--ink);background:var(--sun);flex:none}
+.qico.bad{background:#FFC2CA}.qico.brand{background:var(--brand-soft)}.qico.good{background:#B8F2D9}
+.log li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.log li:first-child{border-top:0}
+.log li time{font:600 11px/1.6 var(--f-m);color:var(--mute);white-space:nowrap}
+.log li b{font-weight:700}
+.report{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:14px;border:1.5px solid var(--line2);border-radius:14px;background:var(--card)}
+.report.done{opacity:.6}
+.report blockquote{margin:6px 0 0;padding:8px 12px;border-left:3px solid var(--ink);background:var(--paper);border-radius:0 8px 8px 0;font-size:13px}
+.report .acts{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+@media (max-width:700px){.report{grid-template-columns:1fr}.report .acts{flex-direction:row;flex-wrap:wrap}}
+.rule{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:12px;align-items:center;padding:10px 0;border-top:1.5px dashed var(--line)}
+.rule:first-child{border-top:0}
+.rule b{display:block}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.wchip{display:inline-flex;align-items:center;gap:6px;padding:4px 4px 4px 10px;border-radius:9px;border:1.5px solid var(--line2);background:var(--card);font:700 12px/1 var(--f-m)}
+.wchip small{font:500 11px var(--f-b);color:var(--mute)}
+.wchip button{border:0;background:none;cursor:pointer;color:var(--mute);width:22px;height:22px;border-radius:6px;display:grid;place-items:center}
+.wchip button:hover{background:var(--bad-soft);color:var(--bad)}
+.wchip.warn{border-color:#F4B37F;background:var(--warn-soft)}
+.perm td{text-align:center}
+.perm td:first-child{text-align:left;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:4px;border:1.5px solid var(--ink)}
+.chart text{fill:var(--ink2);font:600 10px var(--f-m)}
+.chart .gl line{stroke:var(--line);stroke-width:1}
+.hbar{display:grid;grid-template-columns:110px minmax(0,1fr) 54px;gap:10px;align-items:center;font-size:13px;margin-top:6px}
+.bar{height:10px;border-radius:99px;background:var(--wash);border:1px solid var(--line2);overflow:hidden}
+.bar i{display:block;height:100%}
+.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+@media (max-width:900px){.days{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.day{border:1.5px solid var(--line2);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--card)}
+.day b{font:800 13px/1.2 var(--f-d)}
+.day .input{height:34px;font-size:12.5px;padding:0 8px}
+
+/* drawer & modal */
+#layer:empty{display:none}
+.scrim{position:fixed;inset:0;z-index:60;background:rgba(23,20,42,.42);animation:fade .15s ease}
+@keyframes fade{from{opacity:0}}
+.drawer{position:fixed;top:0;right:0;bottom:0;z-index:61;width:min(480px,100vw);background:var(--card);border-left:2px solid var(--ink);box-shadow:-8px 0 0 rgba(23,20,42,.12);overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;animation:slide .2s cubic-bezier(.2,.9,.3,1)}
+@keyframes slide{from{transform:translateX(30px);opacity:0}}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:61;width:min(620px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:var(--card);border:2px solid var(--ink);border-radius:22px;box-shadow:6px 6px 0 var(--ink);padding:20px;display:flex;flex-direction:column;gap:14px}
+.m-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.m-h p{color:var(--ink2);font-size:13px;margin-top:4px}
+.x{width:34px;height:34px;border-radius:10px;border:2px solid var(--ink);background:var(--card);display:grid;place-items:center;cursor:pointer;flex:none}
+dl.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;margin:0;font-size:13px}
+dl.kv dt{color:var(--ink2)} dl.kv dd{margin:0;text-align:right;font:600 12.5px/1.4 var(--f-m)}
+.section{border-top:1.5px dashed var(--line2);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:80;transform:translate(-50%,14px);opacity:0;pointer-events:none;max-width:calc(100vw - 32px);padding:11px 15px;border-radius:13px;background:var(--ink);color:#fff;font-weight:700;font-size:13.5px;box-shadow:4px 4px 0 var(--sun);transition:opacity .2s,transform .2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.denied{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:60px 20px;border:2px dashed var(--line2);border-radius:20px;background:var(--card)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+
+<div class="shell">
+  <aside id="rail"></aside>
+  <main>
+    <header id="top"></header>
+    <div id="main" tabindex="-1"></div>
+  </main>
+</div>
+<div id="layer"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script>
+(function(){
+'use strict';
+/* ========================= utils ========================= */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Math.round(n).toLocaleString('fr-FR');
+const eur=n=>Math.round(n).toLocaleString('fr-FR')+' €';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function rng(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let x=Math.imul(a^a>>>15,1|a);x=x+Math.imul(x^x>>>7,61|x)^x;return((x^x>>>14)>>>0)/4294967296;};}
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+const DAY=864e5;let NOW=Date.now();
+const dShort=ts=>new Date(ts).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+const dLong=ts=>new Date(ts).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+const dTime=ts=>new Date(ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+function ago(ts){const s=Math.max(1,Math.round((Date.now()-ts)/1000));if(s<60)return 'il y a '+s+' s';const m=Math.round(s/60);if(m<60)return 'il y a '+m+' min';const h=Math.round(m/60);if(h<24)return 'il y a '+h+' h';const d=Math.round(h/24);return 'il y a '+d+' j';}
+const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z]/g,'');
+const sorted=s=>s.split('').sort().join('');
+
+const ICONS={
+  home:'<path d="M3 9.5 10 4l7 5.5V17a1 1 0 0 1-1 1h-4v-5H8v5H4a1 1 0 0 1-1-1z"/>',
+  users:'<circle cx="7.5" cy="7" r="3"/><path d="M2 17c.5-3 2.7-5 5.5-5s5 2 5.5 5M13 4.2a3 3 0 0 1 0 5.6M15 12c1.8.6 3 2.4 3.3 5"/>',
+  flag:'<path d="M4 18V3M4 3h10l-2 4 2 4H4"/>',
+  shield:'<path d="M10 2.5 16 5v5c0 4-2.8 6.5-6 7.5-3.2-1-6-3.5-6-7.5V5z"/>',
+  book:'<path d="M3 4h5a2 2 0 0 1 2 2v11a2 2 0 0 0-2-2H3zM17 4h-5a2 2 0 0 0-2 2v11a2 2 0 0 1 2-2h5z"/>',
+  campus:'<path d="M2 8l8-4 8 4-8 4zM5 9.5V14c0 1 2.2 2.5 5 2.5s5-1.5 5-2.5V9.5M18 8v5"/>',
+  trophy:'<path d="M6 3h8v4.5a4 4 0 0 1-8 0zM6 5H3v1a3 3 0 0 0 3 3M14 5h3v1a3 3 0 0 1-3 3M10 11.5V14M7 17.5h6M8 14h4v3.5H8z"/>',
+  euro:'<path d="M15 5.5A6 6 0 1 0 15 14.5M3 8.5h8M3 11.5h8"/>',
+  key:'<circle cx="7" cy="12" r="4"/><path d="M10 9l7-7M14 5l2 2M12 7l2 2"/>',
+  search:'<circle cx="9" cy="9" r="5.5"/><path d="M13 13l4.5 4.5"/>',
+  x:'<path d="M5 5l10 10M15 5 5 15"/>',
+  check:'<path d="M4 10.5 8 14.5 16 5.5"/>',
+  plus:'<path d="M10 4v12M4 10h12"/>',
+  lock:'<rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/>',
+  info:'<circle cx="10" cy="10" r="8"/><path d="M10 9v5M10 6.2v.1"/>',
+  alert:'<path d="M10 3 2 17h16zM10 8v4M10 14.5v.1"/>',
+  cal:'<rect x="3" y="4.5" width="14" height="13" rx="2"/><path d="M3 8.5h14M7 3v3M13 3v3"/>',
+  edit:'<path d="M4 16l1-4 8-8 3 3-8 8zM12 5l3 3"/>',
+  trash:'<path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/>',
+  copy:'<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M13 7V4H4v9h3"/>',
+  eye:'<path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z"/><circle cx="10" cy="10" r="2.5"/>',
+  doc:'<path d="M5 2.5h7l3 3V17.5H5zM12 2.5v3h3M8 10h5M8 13h5"/>',
+  refresh:'<path d="M16 10a6 6 0 1 1-1.8-4.3M16 3v3.5h-3.5"/>',
+  bolt:'<path d="M11 2 4 11h5l-1 7 7-9h-5z"/>'
+};
+const ic=(n,s=17)=>`<svg class="ic" width="${s}" height="${s}" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;
+const LOGO=`<svg width="32" height="32" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="10" fill="#5B4BFF" stroke="#fff" stroke-width="2"/><path d="M8 9h6l5 8-5 8H8l5-8z" fill="#fff" stroke="#17142A" stroke-width="1.6" stroke-linejoin="round"/><path d="M27 9h-5l-5 8 5 8h5l-5-8z" fill="#FFC93C" stroke="#17142A" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+
+/* ========================= reference data ========================= */
+const SCH0=[
+  {id:'nbu',name:'Northbridge University',short:'NBU',city:'Lyon',country:'France',domain:'northbridge.demo',col:'#3D7BFF',status:'paid'},
+  {id:'lys',name:'Université de Lysière',short:'UdL',city:'Lyon',country:'France',domain:'lysiere.demo',col:'#8B5CF6',status:'free'},
+  {id:'cbs',name:'Coastal Business School',short:'CBS',city:'Le Havre',country:'France',domain:'coastal-bs.demo',col:'#FF6B3D',status:'paid'},
+  {id:'hit',name:'Halvorsen Institute of Technology',short:'HIT',city:'Oslo',country:'Norvège',domain:'halvorsen.demo',col:'#00A6C8',status:'none'},
+  {id:'evc',name:'Eastvale College',short:'EVC',city:'Manchester',country:'Royaume-Uni',domain:'eastvale.demo',col:'#FF4FA0',status:'free'},
+  {id:'mir',name:'Mirandel Academy',short:'MIR',city:'Madrid',country:'Espagne',domain:'mirandel.demo',col:'#E0A100',status:'none'},
+  {id:'ksu',name:'Kestrel State University',short:'KSU',city:'Toronto',country:'Canada',domain:'kestrel.demo',col:'#14B37A',status:'none'},
+  {id:'ari',name:'Arisaka Institute',short:'ARI',city:'Osaka',country:'Japon',domain:'arisaka.demo',col:'#F23F55',status:'none'}
+];
+const SCH_STATUS={paid:['Partenaire payant','good'],free:['Partenaire gratuit','brand'],none:['Non partenaire','']};
+const PROGRAMS={bus1:'Commerce · 1re année',bus2:'Commerce · 2e année',eng1:'Ingénierie · 1re année',eng2:'Ingénierie · 2e année',log1:'Logistique · Master 1',des3:'Design · 3e année',cs2:'Informatique · 2e année',law1:'Droit · 1re année'};
+const PROG_IDS=Object.keys(PROGRAMS);
+const GAMES0=[
+  {id:'sprint',name:'Neon Sprint',col:'#3D7BFF'},{id:'reflex',name:'Reflex Arena',col:'#FF6B3D'},{id:'brain',name:'Brain Battle',col:'#8B5CF6'},{id:'cards',name:'Card Clash',col:'#FFB800'},
+  {id:'stack',name:'Skyline Stack',col:'#FF4FA0'},{id:'grid',name:'Grid Lock',col:'#14B37A'},{id:'words',name:'Word Rush',col:'#00A6C8'},{id:'aim',name:'Pop Shot',col:'#F23F55'},{id:'party',name:'Pulse Party',col:'#B5B0C7',dev:true}
+];
+const TRACKS=['City Loop','Canyon Run','Harbor Hairpin'];
+const QCATS={sci:'Sciences',geo:'Géographie',his:'Histoire',spo:'Sport',tec:'Tech',bus:'Business',cul:'Culture'};
+const ROLES={super:'Super admin',mod:'Modération',content:'Contenu',partner:'Partenariats'};
+const SECTIONS=[
+  ['overview','Vue d’ensemble','home',['super','mod','content','partner'],null],
+  ['players','Joueurs','users',['super','mod'],'Communauté'],
+  ['moderation','Signalements','flag',['super','mod'],'Communauté'],
+  ['anticheat','Anti-triche','shield',['super','mod'],'Communauté'],
+  ['content','Contenu des jeux','book',['super','content'],'Produit'],
+  ['competitions','Compétitions','trophy',['super','content','partner'],'Produit'],
+  ['schools','Écoles','campus',['super','partner'],'Partenaires'],
+  ['business','Revenus','euro',['super','partner'],'Partenaires'],
+  ['team','Équipe & journal','key',['super'],'Administration']
+];
+const SEC=Object.fromEntries(SECTIONS.map(s=>[s[0],s]));
+const RULES_META={
+  reflex_min:{n:'Réflexe sous le seuil humain',d:'Signale une moyenne Reflex Arena plus rapide que le seuil.',unit:'ms'},
+  sprint_min:{n:'Temps sous la limite physique',d:'Signale une course Neon Sprint plus rapide que ce % du par.',unit:'% du par'},
+  zscore:{n:'Bond anormal par rapport à l’historique',d:'Écart au score moyen du joueur, en écarts-types.',unit:'σ'},
+  rate:{n:'Cadence de parties anormale',d:'Nombre de parties soumises par heure.',unit:'parties/h'},
+  words_speed:{n:'Mots trouvés trop vite',d:'Temps moyen par mot dans Word Rush.',unit:'s/mot'}
+};
+const MOTIFS=['Pseudo inapproprié','Triche ou score falsifié','Comportement toxique','Usurpation d’identité','Spam'];
+
+
+/* =========================================================
+   Console connectée à Supabase
+   ========================================================= */
+const CFG=window.RYVO_CONFIG||{};
+const CONFIGURED=!!(CFG.url&&CFG.anonKey&&window.supabase);
+const sb=CONFIGURED?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
+const FORMATS={ranking:'Classement sur la période',bracket:'Duels à élimination directe',school:'Coupe des écoles'};
+const ERR={forbidden:'Ton rôle ne permet pas cette action.',mfa_required:'Double authentification requise.',not_authenticated:'Session expirée. Reconnecte-toi.',
+  username_taken:'Ce pseudo est déjà pris.',bad_username:'Pseudo invalide : 3 à 16 lettres, chiffres, point ou tiret bas.',reason_required:'Un motif est obligatoire.',cannot_sanction_self:'Tu ne peux pas te sanctionner toi-même.',
+  not_pending:'Cet élément a déjà été traité.',bad_threshold:'Seuil invalide : saisis un nombre positif.',question_too_short:'Les questions doivent faire au moins 10 caractères dans les deux langues.',
+  four_answers:'Il faut exactement 4 réponses.',empty_answer:'Chaque réponse doit être remplie en français et en anglais.',duplicate_answers:'Les quatre réponses en français doivent être différentes.',
+  duplicate_question:'Cette question existe déjà.',word_length:'Le mot doit faire entre 4 et 8 lettres.',category_required:'Ajoute une catégorie : c’est l’indice affiché au joueur.',word_exists:'Ce mot est déjà dans la liste.',
+  game_off:'Active d’abord le jeu.',name_too_short:'Le nom doit faire au moins 3 caractères.',name_taken:'Une compétition porte déjà ce nom.',start_in_past:'Choisis une date de début à partir d’aujourd’hui.',
+  end_before_start:'La fin doit être après le début.',reward_required:'Indique ce que gagnent les joueurs.',already_started:'Cette compétition a déjà commencé.',end_in_past:'Choisis une date dans le futur.',
+  bad_short:'Sigle : 2 à 5 lettres ou chiffres.',bad_domain:'Domaine attendu : ecole.fr',short_taken:'Sigle déjà utilisé.',domain_taken:'Domaine déjà attribué à une autre école.',city_required:'Indique la ville.',
+  domain_mismatch:'Le domaine ne correspond pas à l’école. Refuse ou demande une autre preuve.',bad_fields:'Vérifie les champs du formulaire.',already_admin:'Cette personne fait déjà partie de l’équipe.',
+  last_super_admin:'Il faut garder au moins un Super admin.',cannot_remove_self:'Tu ne peux pas te retirer toi-même.',game_unavailable:'Ce jeu est désactivé.'};
+function errText(e){const m=String(e&&e.message||e||'');for(const k in ERR)if(m===k||m.startsWith(k))return ERR[k];if(/fetch|network/i.test(m))return 'Problème de connexion. Réessaie.';return m;}
+async function rpc(fn,args){const {data,error}=await sb.rpc(fn,args||{});if(error){if(/mfa_required/.test(error.message)){mfaFlow();}throw new Error(error.message);}return data;}
+async function act(fn,args,okMsg){try{const r=await rpc(fn,args);if(okMsg)toast(okMsg);refreshCounts();return r;}catch(e){toast(errText(e));throw e;}}
+
+const S={auth:{stage:'loading',err:null},role:null,me:null,schools:[],counts:{},d:{},
+  ui:{sec:'overview',pl:{q:'',status:'all',school:'all',ver:'all',sort:'last',dir:-1,page:0},mod:'open',ac:'pending',ct:'questions',qf:{q:'',cat:'all',status:'all'},wl:'fr',sc:'list',cp:'list',logq:'',layer:null,reveal:{}}};
+const can=sec=>!!S.role&&(S.role==='super'||SEC[sec][3].includes(S.role));
+const SC=id=>S.schools.find(s=>s.id===id);
+const GM=id=>GAMES0.find(g=>g.id===id)||{name:id,col:'#999'};
+const COLS=['#5B4BFF','#FF6B3D','#14B37A','#E0A100','#FF4FA0','#00A6C8','#8B5CF6','#F23F55','#3D7BFF'];
+const colOf=id=>COLS[hashStr(String(id))%COLS.length];
+const pav=(p,s=32)=>`<span class="pav" style="background:${colOf(p.id||p.name)};width:${s}px;height:${s}px">${esc(String(p.name||'?')[0].toUpperCase())}</span>`;
+const statusBadge=p=>p.status==='banned'?'<span class="badge bad">Banni</span>':p.status==='suspended'?`<span class="badge warn">Suspendu${p.until?' · '+dShort(p.until):''}</span>`:'<span class="badge good">Actif</span>';
+const skLabel=sk=>{const g=String(sk).split('@');return g[0]==='sprint'?'Neon Sprint · '+TRACKS[+g[1]||0]:GM(g[0]).name;};
+const fmtScore=(sk,v)=>{if(v==null)return '—';const g=String(sk).split('@')[0];if(g==='sprint')return Number(v).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' s';if(g==='reflex')return Math.round(v)+' ms';return fmt(v)+' pts';};
+let toastT=0;function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),3400);}
+function logList(items){
+  if(!items||!items.length)return `<div class="empty"><b>Aucune action pour l’instant</b>Chaque action de l’équipe apparaîtra ici.</div>`;
+  return `<ul class="log">${items.map(l=>`<li><time datetime="${new Date(l.t).toISOString()}">${dTime(l.t)}</time><span><b>${esc(l.who||'—')}</b> ${l.role?`<span class="badge">${ROLES[l.role]||esc(l.role)}</span>`:''} ${esc(l.txt)} <b>${esc(l.target||'')}</b>${l.detail?` <span class="tiny">· ${esc(l.detail)}</span>`:''}</span></li>`).join('')}</ul>`;
+}
+const loading=()=>`<div class="stack">${'<div class="kpi" style="height:70px;background:var(--wash)"></div>'.repeat(3)}</div>`;
+
+/* ---------- authentification + double authentification ---------- */
+async function afterLogin(){
+  S.auth={stage:'loading'};render();
+  try{
+    const me=await rpc('admin_me');S.me=me;
+    if(!me.role){S.auth={stage:'forbidden'};render();return;}
+    if(me.require_mfa&&!me.mfa_ok){await mfaFlow();return;}
+    S.role=me.role;S.auth={stage:'ready'};
+    try{S.schools=(await rpc('public_info')).schools||[];}catch(e){}
+    if(!can(S.ui.sec))S.ui.sec='overview';
+    refreshCounts();loadSection();
+  }catch(e){S.auth={stage:'login',err:errText(e)};render();}
+}
+async function mfaFlow(){
+  try{
+    const {data,error}=await sb.auth.mfa.listFactors();if(error)throw error;
+    const ok=(data.totp||[]).filter(f=>f.status==='verified');
+    if(ok.length){S.auth={stage:'challenge',factorId:ok[0].id};render();return;}
+    for(const f of (data.all||[]).filter(f=>f.status!=='verified'))await sb.auth.mfa.unenroll({factorId:f.id});
+    const en=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'RYVO Admin '+new Date().toISOString().slice(0,10)});if(en.error)throw en.error;
+    S.auth={stage:'enroll',factorId:en.data.id,qr:en.data.totp.qr_code,secret:en.data.totp.secret};render();
+  }catch(e){S.auth={stage:'login',err:'Double authentification : '+errText(e)};render();}
+}
+function gateHTML(){
+  const a=S.auth,err=a.err?`<div class="empty" style="border-color:var(--bad);background:var(--bad-soft);padding:12px">${esc(a.err)}</div>`:'';
+  const card=(t,p,body)=>`<div style="max-width:440px;margin:8vh auto 0" class="card"><div class="logo" style="color:var(--ink)">${LOGO}<span>RYVO<small style="color:var(--mute)">CONSOLE ADMIN</small></span></div><h1 style="font-size:24px">${t}</h1>${p?`<p class="tiny">${p}</p>`:''}${body}</div>`;
+  if(!CONFIGURED)return card('Configuration manquante','Renseigne l’adresse du projet et la clé publique dans <code>config.js</code> à la racine du site.','');
+  if(a.stage==='loading')return card('Connexion…','','<div class="kpi" style="height:46px;background:var(--wash)"></div>');
+  if(a.stage==='forbidden')return card('Accès refusé','Ce compte n’a pas de rôle dans l’équipe RYVO. Si tu as reçu une invitation, connecte-toi avec l’adresse invitée et confirme d’abord ton e-mail.',`<button class="btn" type="button" data-act="logout">Se déconnecter</button>`);
+  if(a.stage==='enroll')return card('Active la double authentification','Obligatoire pour l’équipe. Scanne ce QR code avec Google Authenticator, Microsoft Authenticator ou 1Password, puis saisis le code à 6 chiffres.',
+    `<div style="display:flex;justify-content:center"><img src="${esc(a.qr)}" alt="QR code de double authentification" width="180" height="180" style="border:2px solid var(--ink);border-radius:14px;background:#fff"></div>
+    <p class="tiny">Impossible de scanner ? Saisis cette clé dans l’application : <code class="mono" style="word-break:break-all">${esc(a.secret)}</code></p>
+    <form data-form="mfa" class="stack" novalidate><div class="field"><label for="mfaCode">Code à 6 chiffres</label><input class="input mono" id="mfaCode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>${err}<button class="btn primary" type="submit">Activer et continuer</button></form>
+    <button class="btn ghost sm" type="button" data-act="logout">Se déconnecter</button>`);
+  if(a.stage==='challenge')return card('Double authentification','Saisis le code à 6 chiffres affiché dans ton application.',
+    `<form data-form="mfa" class="stack" novalidate><div class="field"><label for="mfaCode">Code</label><input class="input mono" id="mfaCode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>${err}<button class="btn primary" type="submit">Vérifier</button></form>
+    <button class="btn ghost sm" type="button" data-act="logout">Se déconnecter</button>`);
+  if(a.stage==='newpw')return card('Nouveau mot de passe','',`<form data-form="newpw" class="stack" novalidate><div class="field"><label for="npw">Mot de passe (12 caractères minimum)</label><input class="input" id="npw" name="pw" type="password" autocomplete="new-password"></div>${err}<button class="btn primary" type="submit">Enregistrer</button></form>`);
+  if(a.stage==='recover')return card('Mot de passe oublié','Un lien de réinitialisation sera envoyé si un compte existe.',`<form data-form="recover" class="stack" novalidate><div class="field"><label for="rcMail">E-mail</label><input class="input" id="rcMail" name="email" type="email" autocomplete="email"></div>${err}<button class="btn primary" type="submit">Envoyer le lien</button></form><button class="btn ghost sm" type="button" data-act="gate" data-a="login">Retour</button>`);
+  return card('Connexion équipe','Accès réservé à l’équipe RYVO. Double authentification obligatoire.',
+    `<form data-form="login" class="stack" novalidate><div class="field"><label for="lgMail">E-mail</label><input class="input" id="lgMail" name="email" type="email" autocomplete="username"></div>
+    <div class="field"><label for="lgPw">Mot de passe</label><input class="input" id="lgPw" name="pw" type="password" autocomplete="current-password"></div>${err}<button class="btn primary" type="submit">Se connecter</button></form>
+    <button class="btn ghost sm" type="button" data-act="gate" data-a="recover">Mot de passe oublié ?</button>`);
+}
+
+/* ---------- chargement des données par section ---------- */
+async function refreshCounts(){try{S.counts=await rpc('admin_counts');$('#rail').innerHTML=railHTML();}catch(e){}}
+async function loadSection(){
+  const sec=S.ui.sec,d=S.d;render();
+  try{
+    if(sec==='overview')d.overview=await rpc('admin_overview');
+    if(sec==='players')await loadPlayers();
+    if(sec==='moderation')d.reports=await rpc('admin_reports',{p_status:S.ui.mod});
+    if(sec==='anticheat'){const [f,r]=await Promise.all([rpc('admin_flags',{p_status:S.ui.ac}),rpc('admin_rules')]);d.flags=f;d.rules=r;}
+    if(sec==='content'){if(S.ui.ct==='questions')d.questions=await rpc('admin_questions');if(S.ui.ct==='words')d.words=await rpc('admin_words',{p_lang:S.ui.wl});if(S.ui.ct==='games')d.games=await rpc('admin_games');}
+    if(sec==='competitions')d.comps=await rpc('admin_comps');
+    if(sec==='schools'){d.schools=await rpc('admin_schools');S.schools=d.schools.schools;}
+    if(sec==='business')d.biz=await rpc('admin_business');
+    if(sec==='team'){const [t,l]=await Promise.all([rpc('admin_team'),rpc('admin_log',{p_q:S.ui.logq,p_limit:100})]);d.team=t;d.log=l;}
+    d.err=null;
+  }catch(e){d.err=errText(e);}
+  if(S.ui.sec===sec)render();
+}
+async function loadPlayers(){const f=S.ui.pl;S.d.plist=await rpc('admin_players',{p_q:f.q,p_status:f.status,p_school:f.school,p_ver:f.ver,p_sort:f.sort,p_dir:f.dir,p_offset:f.page*20,p_limit:20});}
+
+/* ========================= chrome ========================= */
+function railHTML(){
+  if(S.auth.stage!=='ready')return `<div class="logo">${LOGO}<span>RYVO<small>CONSOLE ADMIN</small></span></div>`;
+  const c=S.counts||{},cnt={moderation:c.reports,anticheat:c.flags,schools:c.verifs,business:c.late,content:c.drafts};
+  let grp=null,h=`<div class="logo">${LOGO}<span>RYVO<small>CONSOLE ADMIN</small></span></div><nav class="nav" aria-label="Sections">`;
+  SECTIONS.forEach(s=>{if(!can(s[0]))return;if(s[4]!==grp){grp=s[4];if(grp)h+=`<div class="grp">${grp}</div>`;}
+    h+=`<button type="button" data-act="sec" data-a="${s[0]}" ${S.ui.sec===s[0]?'aria-current="page"':''}>${ic(s[2])}${s[1]}${cnt[s[0]]?`<span class="cnt">${cnt[s[0]]}</span>`:''}</button>`;});
+  return h+`</nav><p class="rail-foot">Chaque action est vérifiée par le serveur et inscrite au journal d’audit.</p>`;
+}
+function topHTML(){
+  if(S.auth.stage!=='ready')return '';
+  const me=S.me||{};
+  return `<div class="grow"></div><a class="btn sm ghost" href="../" target="_blank" rel="noopener">Ouvrir le jeu</a>
+  <span class="who"><span class="av">${esc(String(me.name||'?')[0].toUpperCase())}</span><span class="tiny" style="font-weight:700">${esc(me.name||'')} · ${ROLES[S.role]}</span></span>
+  <button class="btn sm" type="button" data-act="logout">Se déconnecter</button>`;
+}
+const head=(eyebrow,title,sub,right='')=>`<div class="page-h"><div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1>${sub?`<p>${sub}</p>`:''}</div><div class="row">${right}</div></div>`;
+const tabs=(cur,act,items)=>`<div class="tabs" role="tablist">${items.map(([k,l,n])=>`<button type="button" role="tab" aria-selected="${cur===k}" data-act="${act}" data-a="${k}">${l}${n!=null?`<span class="n">${n}</span>`:''}</button>`).join('')}</div>`;
+const sw=(act,a,on,label)=>`<span class="switch"><input type="checkbox" data-act="${act}" data-a="${a}" ${on?'checked':''} aria-label="${esc(label)}"><i></i></span>`;
+const V={};
+
+/* ========================= overview ========================= */
+V.overview=()=>{
+  const o=S.d.overview;if(!o)return head('Vue d’ensemble','Bonjour '+esc((S.me||{}).name||''),'')+loading();
+  const c=o.counts||{},series=o.series||[];
+  const W=640,H=200,pl=36,pr=12,pt=14,pb=26,max=Math.max(5,Math.ceil(Math.max(...series.map(s=>s[1]),0)/5)*5);
+  const x=i=>pl+i*(W-pl-pr)/Math.max(1,series.length-1),y=v=>pt+(H-pt-pb)*(1-v/max);
+  const path=series.map((s,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(s[1]).toFixed(1)).join(' '),last=series[series.length-1]||[Date.now(),0];
+  const chart=series.length?`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Joueurs actifs par jour sur 30 jours, dernier jour ${last[1]}" style="width:100%;height:auto">
+    <g class="gl">${[0,max/2,max].map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}"/><text x="${pl-6}" y="${y(t)+3}" text-anchor="end">${fmt(t)}</text>`).join('')}</g>
+    <path d="${path} L${x(series.length-1)} ${y(0)} L${x(0)} ${y(0)}Z" fill="#ECEAFF"/><path d="${path}" fill="none" stroke="#17142A" stroke-width="2.5" stroke-linejoin="round"/>
+    ${series.map((s,i)=>(i%7===0&&i<series.length-4)||i===series.length-1?`<text x="${x(i)}" y="${H-8}" text-anchor="${i===series.length-1?'end':'middle'}">${dShort(s[0])}</text>`:'').join('')}
+    <circle cx="${x(series.length-1)}" cy="${y(last[1])}" r="5" fill="#FFC93C" stroke="#17142A" stroke-width="2"/><text x="${x(series.length-1)-8}" y="${y(last[1])-10}" text-anchor="end" style="fill:#17142A;font-weight:700">${last[1]}</text></svg>`:'';
+  const games=(o.plays||[]).slice().sort((a,b)=>b.plays-a.plays),gmax=Math.max(1,...games.map(g=>g.plays));
+  const q=[];
+  if(c.reports)q.push(['flag','bad',`${c.reports} signalement${c.reports>1?'s':''} ouvert${c.reports>1?'s':''}`,'Pseudos, triche, usurpation','moderation']);
+  if(c.flags)q.push(['shield','',`${c.flags} score${c.flags>1?'s':''} suspect${c.flags>1?'s':''}`,'Détectés par les règles anti-triche','anticheat']);
+  if(c.verifs)q.push(['campus','brand',`${c.verifs} vérification${c.verifs>1?'s':''} d’école`,'Étudiants en attente de badge','schools']);
+  if(c.late)q.push(['euro','bad',`${c.late} facture${c.late>1?'s':''} en retard`,'À relancer','business']);
+  if(c.drafts)q.push(['book','good',`${c.drafts} question${c.drafts>1?'s':''} en brouillon`,'À relire et publier','content']);
+  const vq=q.filter(x=>can(x[4]));
+  return head('Vue d’ensemble','Bonjour '+esc((S.me||{}).name||''),'Ce qui demande une décision, puis l’état de la plateforme. Données réelles.')+`
+  <div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><small>Joueurs inscrits</small><b>${fmt(o.players)}</b><span class="d">${o.new7} cette semaine</span></div>
+    <div class="kpi"><small>Actifs · 7 jours</small><b>${fmt(o.active7)}</b><span class="d">${o.players?Math.round(o.active7/o.players*100):0} % des inscrits</span></div>
+    <div class="kpi"><small>Actifs · 30 jours</small><b>${fmt(o.active30)}</b><span class="d">${o.verified} étudiants vérifiés</span></div>
+    <div class="kpi"><small>Abonnés Plus</small><b>${fmt(o.plus)}</b><span class="d">${eur(o.plus*(o.plus_price||0))} / mois</span></div>
+    <div class="kpi ${vq.length?'alert':''}"><small>Décisions en attente</small><b>${(c.reports||0)+(c.flags||0)+(c.verifs||0)}</b><span class="d">modération, triche, écoles</span></div>
+  </div>
+  <div class="grid">
+    <section class="card c5"><div class="card-h"><h2>À traiter</h2></div>
+      ${vq.length?`<ul class="queue">${vq.map(x=>`<li><span class="qico ${x[1]}">${ic(x[0])}</span><span><b>${x[2]}</b><span class="tiny" style="display:block">${x[3]}</span></span><button class="btn sm" type="button" data-act="sec" data-a="${x[4]}">Ouvrir</button></li>`).join('')}</ul>`:`<div class="empty"><b>Rien en attente</b>Toutes les files sont vides.</div>`}
+    </section>
+    <section class="card c7"><div class="card-h"><h2>Joueurs actifs par jour</h2><span class="tiny">30 derniers jours</span></div>${chart||'<div class="empty"><b>Pas encore de données</b></div>'}</section>
+    <section class="card c5"><div class="card-h"><h2>Jeux les plus joués</h2><span class="tiny">Parties sur 7 jours</span></div>
+      ${games.map(g=>{const G=GM(g.id);return `<div class="hbar"><span>${G.name}</span><div class="bar"><i style="width:${g.plays/gmax*100}%;background:${G.col}"></i></div><span class="mono tiny" style="text-align:right">${fmt(g.plays)}</span></div>`;}).join('')}
+    </section>
+    <section class="card c7"><div class="card-h"><h2>Activité récente de l’équipe</h2>${can('team')?'<button class="btn sm ghost" type="button" data-act="sec" data-a="team">Journal complet</button>':''}</div>${logList(o.log)}</section>
+  </div>`;
+};
+
+/* ========================= players ========================= */
+V.players=()=>{
+  const f=S.ui.pl;
+  return head('Communauté','Joueurs','Cherche un compte, ouvre sa fiche pour agir. Chaque action est inscrite au journal d’audit.')+`
+  <div class="filters" style="margin-bottom:12px">
+    <div class="search">${ic('search',16)}<input class="input" id="plq" data-in="plq" value="${esc(f.q)}" placeholder="Pseudo, identifiant ou e-mail" autocomplete="off" aria-label="Rechercher un joueur"></div>
+    <div class="field"><label for="pls">Statut</label><select class="input" id="pls" data-ch="pls"><option value="all">Tous</option><option value="active" ${f.status==='active'?'selected':''}>Actifs</option><option value="suspended" ${f.status==='suspended'?'selected':''}>Suspendus</option><option value="banned" ${f.status==='banned'?'selected':''}>Bannis</option></select></div>
+    <div class="field"><label for="plsc">École</label><select class="input" id="plsc" data-ch="plsc"><option value="all">Toutes</option>${S.schools.map(s=>`<option value="${s.id}" ${f.school===s.id?'selected':''}>${esc(s.short)}</option>`).join('')}</select></div>
+    <div class="field"><label for="plv">Vérifié</label><select class="input" id="plv" data-ch="plv"><option value="all">Tous</option><option value="yes" ${f.ver==='yes'?'selected':''}>Oui</option><option value="no" ${f.ver==='no'?'selected':''}>Non</option></select></div>
+  </div><div id="plTable">${playersTable()}</div>`;
+};
+function playersTable(){
+  const f=S.ui.pl,d=S.d.plist;if(!d)return loading();
+  const th=(k,l,cls='')=>`<th class="${cls}"><button type="button" data-act="sort" data-a="${k}">${l}${f.sort===k?(f.dir>0?' ↑':' ↓'):''}</button></th>`;
+  if(!d.total)return `<div class="empty"><b>${f.q||f.status!=='all'||f.school!=='all'||f.ver!=='all'?'Aucun joueur ne correspond':'Aucun joueur inscrit pour l’instant'}</b>${f.q||f.status!=='all'||f.school!=='all'||f.ver!=='all'?'<button class="btn sm" type="button" data-act="plReset">Réinitialiser les filtres</button>':'Les comptes apparaîtront ici dès les premières inscriptions.'}</div>`;
+  const pages=Math.max(1,Math.ceil(d.total/20));
+  return `<div class="tblw"><table class="tbl"><thead><tr>${th('name','Joueur')}<th>École</th>${th('level','Niveau','num')}${th('rating','Cote','num')}${th('matches','Parties','num')}${th('last','Dernière activité')}<th>Statut</th>${th('reports','Signal.','num')}</tr></thead><tbody>
+    ${d.rows.map(p=>{const s=SC(p.school);return `<tr class="click" data-act="player" data-a="${p.id}" tabindex="0"><td><span class="player">${pav(p)}<span style="min-width:0"><b>${esc(p.name)}</b>${p.plus?' <span class="badge brand">Plus</span>':''}<span class="sub">${esc(p.mail||'')}</span></span></span></td>
+      <td>${s?esc(s.short):'—'}${p.verified?' <span class="badge good">vérifié</span>':''}</td><td class="num">${p.level}</td><td class="num">${fmt(p.rating)}</td><td class="num">${fmt(p.matches)}</td><td>${ago(p.last)}</td><td>${statusBadge(p)}</td><td class="num">${p.reports?`<span class="badge bad">${p.reports}</span>`:'0'}</td></tr>`;}).join('')}
+  </tbody></table></div>
+  <div class="pager"><span class="tiny">${fmt(d.total)} joueur${d.total>1?'s':''} · page ${f.page+1} / ${pages}</span><span class="row"><button class="btn sm" type="button" data-act="page" data-a="-1" ${f.page<=0?'disabled':''}>Précédent</button><button class="btn sm" type="button" data-act="page" data-a="1" ${f.page>=pages-1?'disabled':''}>Suivant</button></span></div>`;
+}
+function playerDrawer(){
+  const p=S.d.player;
+  if(!p)return `<div class="m-h"><h2>Chargement…</h2><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>${loading()}`;
+  const s=SC(p.school),ro=!['super','mod'].includes(S.role),rev=S.ui.reveal[p.id];
+  return `<div class="m-h"><div class="player">${pav(p,48)}<div><h2>${esc(p.name)}</h2><div class="row" style="margin-top:6px">${statusBadge(p)}${p.verified?'<span class="badge good">Étudiant vérifié</span>':'<span class="badge">Non vérifié</span>'}${p.plus?'<span class="badge brand">Plus</span>':''}</div></div></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
+  <dl class="kv">
+    <dt>Identifiant</dt><dd>${esc(String(p.id).slice(0,8))}…</dd>
+    <dt>E-mail</dt><dd>${esc(rev||p.mail||'')} ${rev?'':`<button class="btn sm ghost" type="button" data-act="reveal" data-a="${p.id}">${ic('eye',14)}Afficher</button>`}</dd>
+    <dt>École</dt><dd>${s?esc(s.name):'—'}</dd><dt>Programme</dt><dd>${esc(PROGRAMS[p.program]||'—')}</dd>
+    <dt>Inscrit le</dt><dd>${dLong(p.joined)}</dd><dt>Dernière activité</dt><dd>${ago(p.last)}</dd>
+    <dt>Niveau · cote</dt><dd>${p.level} · ${fmt(p.rating)} SR</dd><dt>Parties</dt><dd>${fmt(p.matches)}</dd>
+  </dl>
+  <p class="tiny">${ic('info',14)} L’adresse complète est masquée par défaut. L’afficher est inscrit au journal.</p>
+  ${p.runs&&p.runs.length?`<div class="section"><h3>Dernières parties</h3><div class="tblw"><table class="tbl"><tbody>${p.runs.map(r=>`<tr><td>${esc(skLabel(r.sk))}</td><td class="num">${fmtScore(r.sk,r.s)}</td><td><span class="badge ${r.st==='valid'?'good':r.st==='flagged'?'warn':r.st==='void'?'bad':''}">${r.st}</span></td><td>${ago(r.t)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+  ${p.reports_list&&p.reports_list.length?`<div class="section"><h3>Signalements (${p.reports_list.length})</h3>${p.reports_list.map(r=>`<p class="tiny"><span class="badge ${r.status==='open'?'bad':''}">${r.status==='open'?'ouvert':esc(r.res||'traité')}</span> ${esc(r.type)} · ${ago(r.t)} : « ${esc(r.text)} »</p>`).join('')}</div>`:''}
+  ${ro?'<div class="section"><p class="tiny">Ce rôle peut consulter mais pas sanctionner.</p></div>':`
+  <div class="section"><h3>Renommer</h3><p class="tiny">À utiliser pour un pseudo inapproprié ou une usurpation.</p>
+    <div class="row"><input class="input" id="dRename" maxlength="16" value="${esc(p.name)}" style="flex:1;min-width:160px" aria-label="Nouveau pseudo"><button class="btn" type="button" data-act="pAct" data-a="rename">Renommer</button></div></div>
+  <div class="section"><h3>Sanction</h3>
+    ${p.status==='active'?`<div class="fgrid"><div class="field"><label for="dDur">Durée</label><select class="input" id="dDur"><option value="1">24 heures</option><option value="7" selected>7 jours</option><option value="30">30 jours</option></select></div>
+      <div class="field"><label for="dMot">Motif</label><select class="input" id="dMot">${MOTIFS.map(m=>`<option>${m}</option>`).join('')}</select></div></div>
+      <div class="row"><button class="btn sun" type="button" data-act="pAct" data-a="suspend">Suspendre</button><button class="btn danger" type="button" data-act="askBan">Bannir…</button></div>`
+     :`<div class="row"><button class="btn good" type="button" data-act="pAct" data-a="lift">${p.status==='banned'?'Lever le bannissement':'Lever la suspension'}</button></div>`}
+  </div>
+  <div class="section"><h3>Vérification école</h3><div class="row"><button class="btn sm" type="button" data-act="pAct" data-a="${p.verified?'unverify':'verify'}">${p.verified?'Retirer la vérification':'Marquer comme vérifié'}</button></div></div>
+  <div class="section"><h3>Scores</h3><div class="row"><button class="btn" type="button" data-act="askResetScores">${ic('refresh',15)}Réinitialiser ses scores…</button></div></div>`}
+  <div class="section"><h3>Notes internes</h3><textarea class="input" id="dNotes" placeholder="Visible uniquement par l’équipe" ${ro?'readonly':''}>${esc(p.notes||'')}</textarea>${ro?'':`<div class="row"><button class="btn sm" type="button" data-act="pAct" data-a="note">Enregistrer la note</button></div>`}</div>
+  <div class="section"><h3>Historique des actions</h3>${logList(p.log)}</div>`;
+}
+
+/* ========================= moderation ========================= */
+V.moderation=()=>{
+  const list=S.d.reports,c=S.counts||{};
+  return head('Communauté','Signalements','Les joueurs signalent un pseudo, une triche ou un comportement.',tabs(S.ui.mod,'modTab',[['open','Ouverts',c.reports],['done','Traités',null]]))+
+  (!list?loading():list.length?`<div class="stack">${list.map(r=>{const t=r.target;return `<article class="report ${r.status!=='open'?'done':''}"><div style="min-width:0">
+      <div class="row"><span class="badge ${/Triche/.test(r.type)?'bad':/Usurpation/.test(r.type)?'warn':''}">${esc(r.type)}</span><span class="tiny">${ago(r.t)} · signalé par ${esc(r.reporter)}</span>${r.status!=='open'?`<span class="badge good">${esc(r.res||'')}</span>`:''}</div>
+      <p style="margin-top:8px"><button class="btn sm ghost" type="button" data-act="player" data-a="${t.id}" style="padding:0 6px">${pav(t,22)} <b>${esc(t.name)}</b></button> ${statusBadge(t)} <span class="tiny">${t.open} signalement(s) ouvert(s)</span></p>
+      ${r.text?`<blockquote>${esc(r.text)}</blockquote>`:''}</div>
+      ${r.status==='open'?`<div class="acts"><button class="btn sm" type="button" data-act="rep" data-a="${r.id}:ignore">Ignorer</button><button class="btn sm" type="button" data-act="rep" data-a="${r.id}:warn">Avertir</button><button class="btn sm" type="button" data-act="player" data-a="${t.id}">Ouvrir la fiche…</button><button class="btn sm sun" type="button" data-act="rep" data-a="${r.id}:suspend">Suspendre 7 j</button></div>`:''}
+    </article>`;}).join('')}</div>`:`<div class="empty"><b>${S.ui.mod==='open'?'Aucun signalement ouvert':'Aucun signalement traité'}</b></div>`);
+};
+
+/* ========================= anti-cheat ========================= */
+V.anticheat=()=>{
+  const list=S.d.flags,R=S.d.rules,c=S.counts||{};
+  return head('Communauté','Anti-triche','Les scores qui déclenchent une règle restent hors des classements jusqu’à ta décision. Le serveur recalcule déjà chaque score : ces règles sont un deuxième filet.',tabs(S.ui.ac,'acTab',[['pending','À examiner',c.flags],['done','Traités',null]]))+`
+  <div class="grid">
+    <section class="c12">${!list?loading():list.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Joueur</th><th>Jeu</th><th class="num">Résultat</th><th>Règle</th><th>Détail</th><th class="num">Confiance</th><th>Date</th><th></th></tr></thead><tbody>
+      ${list.map(f=>`<tr><td><button class="btn sm ghost" type="button" data-act="player" data-a="${f.player.id}" style="padding:0 4px">${pav(f.player,24)} ${esc(f.player.name)}</button></td><td><span class="dot" style="background:${GM(f.game).col};border:1.5px solid #17142A"></span> ${esc(skLabel(f.sk))}</td><td class="num">${fmtScore(f.sk,f.score)}</td><td>${esc((RULES_META[f.rule]||{n:f.rule}).n)}</td><td class="tiny">${esc(f.detail||'')}</td>
+        <td class="num"><span class="badge ${f.conf>=85?'bad':f.conf>=60?'warn':''}">${f.conf??'—'} %</span></td><td>${ago(f.t)}</td>
+        <td class="act">${f.status==='pending'?`<button class="btn sm" type="button" data-act="flag" data-a="${f.id}:valid">Valider</button> <button class="btn sm sun" type="button" data-act="flag" data-a="${f.id}:void">Annuler le score</button> <button class="btn sm danger" type="button" data-act="flag" data-a="${f.id}:voidban">Annuler + suspendre</button>`:`<span class="badge ${f.status==='valid'?'good':'bad'}">${f.status==='valid'?'Validé':'Annulé'}</span>`}</td></tr>`).join('')}
+    </tbody></table></div>`:`<div class="empty"><b>${S.ui.ac==='pending'?'Aucun score à examiner':'Rien de traité pour l’instant'}</b></div>`}</section>
+    <section class="card c7"><div class="card-h"><h2>Règles de détection</h2><button class="btn sm primary" type="button" data-act="saveRules" ${R?'':'disabled'}>Enregistrer les règles</button></div>
+      ${R?`<div>${Object.entries(RULES_META).map(([k,m])=>`<div class="rule">${sw('ruleOn',k,R[k].on,m.n)}<span><b>${m.n}</b><span class="tiny">${m.d}</span></span><span class="row" style="flex-wrap:nowrap"><input class="input mono" type="number" step="any" min="0" id="rule_${k}" value="${R[k].val}" aria-label="Seuil ${esc(m.n)}" style="width:76px"><span class="tiny">${m.unit}</span></span></div>`).join('')}
+      <div class="rule">${sw('autoVoid','x',R.autoVoid,'Annulation automatique')}<span><b>Annulation automatique au-dessus de 95 % de confiance</b><span class="tiny">Sinon, tout passe par une décision humaine.</span></span><span></span></div></div>`:loading()}
+    </section>
+    <section class="card c5"><div class="card-h"><h2>Classements</h2></div>
+      <p class="tiny">Remet à zéro un classement après une faille ou un changement de règles. Les parties sont archivées, pas supprimées.</p>
+      <div class="field"><label for="lbReset">Classement</label><select class="input" id="lbReset"><option value="rating">Cote compétitive (retour à 1 000)</option>${GAMES0.filter(g=>!g.dev).flatMap(g=>g.id==='sprint'?TRACKS.map((t,i)=>`<option value="sprint@${i}">Neon Sprint · ${t}</option>`):[`<option value="${g.id}">${g.name}</option>`]).join('')}</select></div>
+      <button class="btn danger" type="button" data-act="askLbReset">Réinitialiser…</button>
+    </section>
+  </div>`;
+};
+
+/* ========================= content ========================= */
+V.content=()=>{
+  const t=S.ui.ct,d=S.d;
+  const top=head('Produit','Contenu des jeux','Questions, mots et réglages des jeux. Les changements sont visibles dans le jeu immédiatement.',tabs(t,'ctTab',[['questions','Questions Brain Battle',d.questions?d.questions.length:null],['words','Mots Word Rush',null],['games','Jeux',null]]));
+  if(t==='words')return top+wordsView();
+  if(t==='games')return top+gamesView();
+  if(!d.questions)return top+loading();
+  const f=S.ui.qf,q=f.q.trim().toLowerCase();
+  const list=d.questions.filter(x=>(!q||x.q.fr.toLowerCase().includes(q)||x.q.en.toLowerCase().includes(q))&&(f.cat==='all'||x.cat===f.cat)&&(f.status==='all'||x.status===f.status));
+  const pub=d.questions.filter(x=>x.status==='published').length;
+  return top+`${pub<8?`<div class="empty" style="border-color:var(--bad);background:var(--bad-soft);margin-bottom:12px"><b>Moins de 8 questions publiées</b>Brain Battle ne peut pas démarrer tant qu’il n’y en a pas au moins 8.</div>`:''}
+  <div class="filters" style="margin-bottom:12px">
+    <div class="search">${ic('search',16)}<input class="input" id="qq" data-in="qq" value="${esc(f.q)}" placeholder="Rechercher une question" aria-label="Rechercher une question"></div>
+    <div class="field"><label for="qcat">Catégorie</label><select class="input" id="qcat" data-ch="qcat"><option value="all">Toutes</option>${Object.entries(QCATS).map(([k,v])=>`<option value="${k}" ${f.cat===k?'selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="field"><label for="qst">Statut</label><select class="input" id="qst" data-ch="qst"><option value="all">Tous</option><option value="published" ${f.status==='published'?'selected':''}>Publiées</option><option value="draft" ${f.status==='draft'?'selected':''}>Brouillons</option></select></div>
+    <button class="btn primary" type="button" data-act="qEdit" data-a="">${ic('plus',15)}Nouvelle question</button>
+  </div>
+  ${list.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Question</th><th>Catégorie</th><th>Statut</th><th class="num">Réponses</th><th class="num">Réussite</th><th></th></tr></thead><tbody>
+    ${list.map(x=>{const hard=x.plays>100&&x.rate<20,easy=x.plays>100&&x.rate>95;return `<tr><td style="min-width:260px"><b>${esc(x.q.fr)}</b><span class="sub">${esc(x.q.en)}</span><span class="sub">✓ ${esc(x.a[x.correct].fr)}</span></td><td>${QCATS[x.cat]}</td>
+      <td>${x.status==='published'?'<span class="badge good">Publiée</span>':'<span class="badge warn">Brouillon</span>'}</td><td class="num">${fmt(x.plays)}</td>
+      <td class="num">${x.plays?x.rate+' %':'—'}${hard?'<br><span class="badge bad">Trop dure ?</span>':easy?'<br><span class="badge warn">Trop facile ?</span>':''}</td>
+      <td class="act"><button class="btn sm ghost" type="button" data-act="qEdit" data-a="${x.id}" aria-label="Modifier">${ic('edit',15)}</button><button class="btn sm ghost" type="button" data-act="qAct" data-a="${x.id}:toggle">${x.status==='published'?'Dépublier':'Publier'}</button><button class="btn sm ghost" type="button" data-act="askQDel" data-a="${x.id}" aria-label="Supprimer">${ic('trash',15)}</button></td></tr>`;}).join('')}
+  </tbody></table></div><p class="tiny" style="margin-top:8px">Une question réussie par moins de 20 % ou plus de 95 % des joueurs (après 100 réponses) est signalée pour relecture.</p>`:`<div class="empty"><b>Aucune question ne correspond</b><button class="btn sm primary" type="button" data-act="qEdit" data-a="">Créer une question</button></div>`}`;
+};
+function qEditor(id){
+  const x=S.ui.layer.draft||(id&&S.d.questions?S.d.questions.find(q=>q.id===id):null)||{cat:'cul',q:{fr:'',en:''},a:[{fr:'',en:''},{fr:'',en:''},{fr:'',en:''},{fr:'',en:''}],correct:0,status:'draft'};
+  const e=S.ui.layer.err;
+  return `<div class="m-h"><div><h2>${id?'Modifier la question':'Nouvelle question'}</h2><p>Chaque question existe en français et en anglais. Coche la bonne réponse : elle n’est jamais envoyée au navigateur des joueurs.</p></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
+  <form data-form="question" data-id="${id||''}" class="stack" novalidate>
+    <div class="fgrid"><div class="field"><label for="qeCat">Catégorie</label><select class="input" id="qeCat" name="cat">${Object.entries(QCATS).map(([k,v])=>`<option value="${k}" ${x.cat===k?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label for="qeSt">Statut</label><select class="input" id="qeSt" name="status"><option value="draft" ${x.status==='draft'?'selected':''}>Brouillon</option><option value="published" ${x.status==='published'?'selected':''}>Publiée</option></select></div>
+      <div class="field full"><label for="qeFr">Question (FR)</label><input class="input" id="qeFr" name="qfr" value="${esc(x.q.fr)}" maxlength="160"></div>
+      <div class="field full"><label for="qeEn">Question (EN)</label><input class="input" id="qeEn" name="qen" value="${esc(x.q.en)}" maxlength="160"></div></div>
+    ${x.a.map((a,i)=>`<fieldset style="border:1.5px solid var(--line2);border-radius:12px;padding:10px 12px;margin:0"><legend class="tiny" style="padding:0 4px"><label><input type="radio" name="correct" value="${i}" ${x.correct===i?'checked':''}> Réponse ${i+1}${x.correct===i?' · bonne réponse':''}</label></legend>
+      <div class="fgrid"><input class="input" name="a${i}fr" value="${esc(a.fr)}" placeholder="Français" aria-label="Réponse ${i+1} en français" maxlength="70"><input class="input" name="a${i}en" value="${esc(a.en)}" placeholder="English" aria-label="Réponse ${i+1} en anglais" maxlength="70"></div></fieldset>`).join('')}
+    ${e?`<div class="empty" style="align-items:flex-start;text-align:left;border-color:var(--bad);background:var(--bad-soft)">${esc(e)}</div>`:''}
+    <div class="row"><button class="btn primary" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-act="close">Annuler</button></div>
+  </form>`;
+}
+function wordsView(){
+  const L=S.ui.wl,w=S.d.words;
+  const top=`<div class="card-h" style="margin:4px 0 12px">${tabs(L,'wlTab',[['fr','Français',w&&w.fr],['en','English',w&&w.en]])}</div>`;
+  if(!w)return top+loading();
+  const by={};w.list.forEach(x=>{(by[x.w.length]=by[x.w.length]||[]).push(x);});
+  const sig={};w.list.forEach(x=>{const k=sorted(x.w);sig[k]=(sig[k]||0)+1;});
+  return top+`<div class="card">
+    <form data-form="word" class="filters" novalidate><div class="field" style="flex:1;min-width:160px"><label for="wNew">Nouveau mot</label><input class="input mono" id="wNew" name="w" placeholder="ex. ${L==='fr'?'TORTUE':'TURTLE'}" maxlength="12" autocomplete="off"></div>
+      <div class="field" style="flex:1;min-width:140px"><label for="wCat">Catégorie (indice affiché)</label><input class="input" id="wCat" name="c" placeholder="Animal" maxlength="20"></div><button class="btn primary" type="submit">${ic('plus',15)}Ajouter</button></form>
+    <p class="tiny">4 à 8 lettres, sans accents (retirés automatiquement). Un mot qui a une anagramme dans la liste est surligné : les deux sont acceptés.${w.list.length<25?` <b style="color:var(--bad)">Il faut au moins 25 mots pour une partie complète.</b>`:''}</p>
+    ${Object.keys(by).sort().map(n=>`<div class="stack" style="gap:6px"><h3>${n} lettres <span class="tiny">· ${by[n].length}</span></h3><div class="chips">${by[n].map(x=>`<span class="wchip ${sig[sorted(x.w)]>1?'warn':''}">${x.w} <small>${esc(x.c)}</small><button type="button" data-act="wDel" data-a="${x.w}" aria-label="Supprimer ${x.w}">${ic('x',13)}</button></span>`).join('')}</div></div>`).join('')}
+  </div>`;
+}
+function gamesView(){
+  const g=S.d.games;if(!g)return loading();
+  return `<div class="tblw" style="margin-top:4px"><table class="tbl"><thead><tr><th>Jeu</th><th>Actif</th><th>En vedette</th><th>Rotation Défi du jour</th><th class="num">Parties · 7 j</th></tr></thead><tbody>
+    ${g.map(x=>{const G=GM(x.id);return `<tr><td><span class="row" style="flex-wrap:nowrap"><span class="pav" style="background:${G.col};width:26px;height:26px"></span><b>${esc(x.name)}</b>${x.dev?' <span class="badge">En développement</span>':''}</span></td>
+      <td>${x.dev?'—':sw('gSet',x.id+':on',x.on,'Actif '+x.name)}</td><td>${x.dev?'—':sw('gSet',x.id+':featured',x.feat,'En vedette '+x.name)}</td><td>${x.dev?'—':sw('gSet',x.id+':daily',x.daily,'Défi du jour '+x.name)}</td><td class="num">${fmt(x.plays)}</td></tr>`;}).join('')}
+  </tbody></table></div><p class="tiny" style="margin-top:8px">Désactiver un jeu le retire de la ludothèque et des Défis du jour. Les scores sont conservés.</p>`;
+}
+
+/* ========================= competitions ========================= */
+const compStatus=c=>c.cancelled?['Annulée','']:Date.now()<c.start?['À venir','brand']:Date.now()>c.end?['Terminée','']:['En cours','good'];
+V.competitions=()=>{
+  const t=S.ui.cp,d=S.d.comps;
+  const top=head('Produit','Compétitions','Tournois, Défis du jour et saisons.',tabs(t,'cpTab',[['list','Tournois',d?d.comps.length:null],['daily','Défi du jour',null],['season','Saison',null]]));
+  if(!d)return top+loading();
+  if(t==='daily')return top+`<section class="card"><div class="card-h"><h2>7 prochains jours</h2><button class="btn sm primary" type="button" data-act="saveDaily">Enregistrer le planning</button></div>
+    <div class="days">${d.daily.map((x,i)=>`<div class="day"><b>${new Date(x.day).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'})}</b>${x.set?'':'<span class="tiny">automatique</span>'}
+      <select class="input" id="dg${i}" data-ch="dailyGame" data-i="${i}" aria-label="Jeu du jour">${GAMES0.filter(g=>!g.dev).map(g=>`<option value="${g.id}" ${x.game===g.id?'selected':''}>${g.name}</option>`).join('')}</select>
+      ${x.game==='sprint'?`<select class="input" id="dt${i}" aria-label="Circuit">${TRACKS.map((tn,j)=>`<option value="${j}" ${x.track===j?'selected':''}>${tn}</option>`).join('')}</select>`:''}</div>`).join('')}</div>
+    <p class="tiny">Tous les joueurs ont le même tirage le même jour. Sans planning, le serveur choisit un jeu automatiquement.</p></section>`;
+  if(t==='season'){const s=d.season||{n:1,end:Date.now()};return top+`<div class="grid"><section class="card c6"><div class="card-h"><h2>Saison ${s.n}</h2><span class="badge good">En cours</span></div>
+    <dl class="kv"><dt>Fin prévue</dt><dd>${dLong(s.end)}</dd><dt>Jours restants</dt><dd>${Math.max(0,Math.ceil((s.end-Date.now())/DAY))}</dd></dl>
+    <div class="field"><label for="seasonEnd">Modifier la date de fin</label><input class="input" type="date" id="seasonEnd" value="${new Date(s.end).toISOString().slice(0,10)}"></div>
+    <div class="row"><button class="btn" type="button" data-act="seasonDate">Enregistrer la date</button><button class="btn danger" type="button" data-act="askSeasonClose">Clôturer maintenant…</button></div>
+    <p class="tiny">Clôturer fige la saison et ramène chaque cote à mi-chemin de 1 000.</p></section>
+    <section class="card c6"><h2>Saisons passées</h2>${d.past.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Saison</th><th>Clôturée le</th><th class="num">Joueurs classés</th></tr></thead><tbody>${d.past.slice().reverse().map(p=>`<tr><td>Saison ${p.n}</td><td>${dLong(p.end)}</td><td class="num">${fmt(p.players||0)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><b>Aucune saison clôturée</b></div>'}</section></div>`;}
+  return top+`<div class="row" style="justify-content:flex-end;margin-bottom:12px"><button class="btn primary" type="button" data-act="compNew">${ic('plus',15)}Créer une compétition</button></div>
+  ${d.comps.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Compétition</th><th>Jeu</th><th>Format</th><th>Dates</th><th>Ouverte à</th><th>Sponsor</th><th class="num">Participants</th><th>Statut</th><th></th></tr></thead><tbody>
+  ${d.comps.map(c=>{const st=compStatus(c),sp=d.sponsors.find(s=>s.id===c.sponsor),sch=c.school==='all'?'Toutes les écoles':((d.schools.find(s=>s.id===c.school)||{}).short||'—');return `<tr><td><b>${esc(c.name)}</b><span class="sub">${esc(c.reward)}</span></td><td>${GM(c.game).name}</td><td>${FORMATS[c.format]}</td><td>${dShort(c.start)} → ${dShort(c.end)}</td>
+    <td>${c.vis==='public'?'Publique':'Privée'} · ${esc(sch)}</td><td>${sp?esc(sp.name)+' <span class="badge">sponsorisé</span>':'—'}</td><td class="num">${fmt(c.players)}</td><td><span class="badge ${st[1]}">${st[0]}</span></td>
+    <td class="act">${st[0]==='À venir'?`<button class="btn sm ghost" type="button" data-act="askCompCancel" data-a="${c.id}">Annuler</button>`:''}<button class="btn sm ghost" type="button" data-act="compAct" data-a="${c.id}:dup" aria-label="Dupliquer">${ic('copy',15)}</button></td></tr>`;}).join('')}
+  </tbody></table></div>`:'<div class="empty"><b>Aucune compétition</b>Crée la première pour un campus ou un sponsor.</div>'}`;
+};
+function compForm(){
+  const e=S.ui.layer.err,v=S.ui.layer.vals||{},d=S.d.comps,in7=new Date(Date.now()+7*DAY).toISOString().slice(0,10),in8=new Date(Date.now()+8*DAY).toISOString().slice(0,10);
+  return `<div class="m-h"><div><h2>Créer une compétition</h2><p>Les lots sont offerts par RYVO ou un sponsor. Pas d’inscription payante avec gains en argent.</p></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
+  <form data-form="comp" class="stack" novalidate><div class="fgrid">
+    <div class="field full"><label for="cfName">Nom</label><input class="input" id="cfName" name="name" maxlength="60" value="${esc(v.name||'')}" placeholder="ex. Coupe Skyline du BDE"></div>
+    <div class="field"><label for="cfGame">Jeu</label><select class="input" id="cfGame" name="game">${GAMES0.filter(g=>!g.dev).map(g=>`<option value="${g.id}" ${v.game===g.id?'selected':''}>${g.name}</option>`).join('')}</select></div>
+    <div class="field"><label for="cfFmt">Format</label><select class="input" id="cfFmt" name="format">${Object.entries(FORMATS).map(([k,l])=>`<option value="${k}" ${v.format===k?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="field"><label for="cfStart">Début</label><input class="input" type="date" id="cfStart" name="start" value="${v.start||in7}"></div>
+    <div class="field"><label for="cfEnd">Fin</label><input class="input" type="date" id="cfEnd" name="end" value="${v.end||in8}"></div>
+    <div class="field"><label for="cfVis">Visibilité</label><select class="input" id="cfVis" name="vis"><option value="private">Privée</option><option value="public" ${v.vis==='public'?'selected':''}>Publique</option></select></div>
+    <div class="field"><label for="cfSch">Écoles</label><select class="input" id="cfSch" name="school"><option value="all">Toutes les écoles</option>${d.schools.map(s=>`<option value="${s.id}" ${v.school===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="cfSp">Sponsor</label><select class="input" id="cfSp" name="sponsor"><option value="">Aucun</option>${d.sponsors.map(s=>`<option value="${s.id}" ${v.sponsor===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="cfRw">Récompense</label><input class="input" id="cfRw" name="reward" maxlength="80" value="${esc(v.reward||'')}" placeholder="ex. Cadre exclusif + goodies"></div>
+  </div>${e?`<div class="empty" style="border-color:var(--bad);background:var(--bad-soft);padding:12px">${esc(e)}</div>`:''}<div class="row"><button class="btn primary" type="submit">Créer</button><button class="btn ghost" type="button" data-act="close">Annuler</button></div></form>`;
+}
+
+/* ========================= schools ========================= */
+V.schools=()=>{
+  const t=S.ui.sc,d=S.d.schools,c=S.counts||{};
+  const top=head('Partenaires','Écoles','Établissements, demandes de vérification et responsables de campus.',tabs(t,'scTab',[['list','Établissements',d?d.schools.length:null],['verifs','Vérifications',c.verifs],['managers','Responsables',d?d.managers.length:null]]));
+  if(!d)return top+loading();
+  if(t==='verifs')return top+`<p class="tiny" style="margin-bottom:10px">${ic('info',14)} Une adresse de l’école ne prouve pas à elle seule l’inscription (anciens élèves, personnel). En cas de doute, demande une confirmation à l’école avant d’approuver.</p>`+(d.verifs.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Étudiant</th><th>École</th><th>Adresse</th><th>Domaine</th><th>Envoyée</th><th></th></tr></thead><tbody>
+    ${d.verifs.map(v=>{const s=d.schools.find(x=>x.id===v.school);return `<tr><td><button class="btn sm ghost" type="button" data-act="player" data-a="${v.player.id}" style="padding:0 4px">${pav(v.player,24)} ${esc(v.player.name)}</button></td><td>${esc(s?s.short:'—')}</td><td class="mono">${esc(v.local)}@${esc(v.domain)}</td>
+      <td>${v.match?'<span class="badge good">Correspond</span>':'<span class="badge bad">Ne correspond pas</span>'}</td><td>${ago(v.t)}</td>
+      <td class="act"><button class="btn sm good" type="button" data-act="verif" data-a="${v.id}:ok">Approuver</button> <button class="btn sm" type="button" data-act="verif" data-a="${v.id}:no">Refuser</button></td></tr>`;}).join('')}</tbody></table></div>`:`<div class="empty"><b>Aucune demande en attente</b></div>`);
+  if(t==='managers')return top+`<div class="grid"><section class="c8">${d.managers.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Nom</th><th>École</th><th>Fonction</th><th>Ajouté</th><th></th></tr></thead><tbody>
+    ${d.managers.map(m=>`<tr><td><b>${esc(m.name)}</b><span class="sub">${esc(m.email)}</span></td><td>${esc((d.schools.find(s=>s.id===m.school)||{}).short||'—')}</td><td>${esc(m.role)}</td><td>${ago(m.t)}</td><td class="act"><button class="btn sm ghost" type="button" data-act="mgrDel" data-a="${m.id}">Retirer</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><b>Aucun responsable</b>Ajoute le contact de chaque école partenaire.</div>'}</section>
+    <section class="card c4"><h2>Ajouter un responsable</h2><form data-form="mgr" class="stack" novalidate>
+      <div class="field"><label for="mgName">Nom</label><input class="input" id="mgName" name="name" maxlength="40"></div>
+      <div class="field"><label for="mgMail">E-mail professionnel</label><input class="input" id="mgMail" name="mail" type="email"></div>
+      <div class="field"><label for="mgSch">École</label><select class="input" id="mgSch" name="school">${d.schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
+      <div class="field"><label for="mgRole">Fonction</label><input class="input" id="mgRole" name="role" maxlength="40" placeholder="ex. Président du BDE"></div>
+      <button class="btn primary" type="submit" ${d.schools.length?'':'disabled'}>Ajouter</button><p class="tiny">Fiche de contact pour l’équipe. L’accès des écoles à un tableau de bord viendra plus tard.</p></form></section></div>`;
+  return top+`<div class="row" style="justify-content:flex-end;margin-bottom:12px"><button class="btn primary" type="button" data-act="schoolEdit" data-a="">${ic('plus',15)}Ajouter un établissement</button></div>
+  ${d.schools.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Établissement</th><th>Ville</th><th>Domaine e-mail</th><th>Statut</th><th class="num">Joueurs</th><th class="num">Vérifiés</th><th></th></tr></thead><tbody>
+  ${d.schools.map(s=>{const st=SCH_STATUS[s.status]||SCH_STATUS.none;return `<tr><td><span class="row" style="flex-wrap:nowrap"><span class="pav" style="background:${s.col};font-size:9px;width:34px">${esc(s.short)}</span><b>${esc(s.name)}</b></span></td><td>${esc(s.city)}, ${esc(s.country)}</td><td class="mono">@${esc(s.domain)}</td><td><span class="badge ${st[1]}">${st[0]}</span></td><td class="num">${s.players}</td><td class="num">${s.verified}</td><td class="act"><button class="btn sm ghost" type="button" data-act="schoolEdit" data-a="${s.id}" aria-label="Modifier">${ic('edit',15)}</button></td></tr>`;}).join('')}
+  </tbody></table></div>`:'<div class="empty"><b>Aucun établissement</b>Ajoute les écoles partenaires : elles apparaîtront dans le jeu (Campus, inscription).</div>'}`;
+};
+function schoolForm(id){
+  const s=(id&&S.d.schools?S.d.schools.schools.find(x=>x.id===id):null)||{name:'',short:'',city:'',country:'France',domain:'',status:'none',col:'#5B4BFF'},e=S.ui.layer.err,v=Object.assign({},s,S.ui.layer.vals||{});
+  const PAL=['#5B4BFF','#3D7BFF','#8B5CF6','#FF6B3D','#FF4FA0','#00A6C8','#14B37A','#E0A100','#F23F55'];
+  return `<div class="m-h"><div><h2>${id?'Modifier l’établissement':'Ajouter un établissement'}</h2></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
+  <form data-form="school" data-id="${id||''}" class="stack" novalidate><div class="fgrid">
+    <div class="field full"><label for="sfName">Nom complet</label><input class="input" id="sfName" name="name" value="${esc(v.name)}" maxlength="80"></div>
+    <div class="field"><label for="sfShort">Sigle</label><input class="input" id="sfShort" name="short" value="${esc(v.short)}" maxlength="5"></div>
+    <div class="field"><label for="sfDom">Domaine e-mail</label><input class="input mono" id="sfDom" name="domain" value="${esc(v.domain)}" placeholder="ecole.fr"><span class="help">Sans le @. Les étudiants doivent utiliser ce domaine pour demander leur badge.</span></div>
+    <div class="field"><label for="sfCity">Ville</label><input class="input" id="sfCity" name="city" value="${esc(v.city)}" maxlength="40"></div>
+    <div class="field"><label for="sfCountry">Pays</label><input class="input" id="sfCountry" name="country" value="${esc(v.country)}" maxlength="40"></div>
+    <div class="field"><label for="sfSt">Statut</label><select class="input" id="sfSt" name="status">${Object.entries(SCH_STATUS).map(([k,l])=>`<option value="${k}" ${v.status===k?'selected':''}>${l[0]}</option>`).join('')}</select></div>
+    <div class="field"><span class="lab">Couleur</span><div class="row">${PAL.map(c=>`<label style="cursor:pointer"><input type="radio" name="col" value="${c}" ${v.col===c?'checked':''} style="position:absolute;opacity:0"><span class="pav" style="background:${c};width:28px;height:28px;${v.col===c?'box-shadow:0 0 0 3px #FFC93C':''}"></span></label>`).join('')}</div></div>
+  </div>${e?`<div class="empty" style="border-color:var(--bad);background:var(--bad-soft);padding:12px">${esc(e)}</div>`:''}<div class="row"><button class="btn primary" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-act="close">Annuler</button></div></form>`;
+}
+
+/* ========================= business ========================= */
+V.business=()=>{
+  const d=S.d.biz;if(!d)return head('Partenaires','Revenus','')+loading();
+  const mrr=d.subs*d.plus_price,inv=d.invoices,paid=inv.filter(i=>i.status==='paid').reduce((s,i)=>s+Number(i.amount),0),due=inv.filter(i=>i.status!=='paid').reduce((s,i)=>s+Number(i.amount),0);
+  const SER=[['plus','Abonnements Plus','#5B4BFF'],['campus','Licences campus','#FFC93C'],['events','Événements & team building','#14B37A'],['sponsors','Sponsors','#FF6B3D']];
+  const rev=d.rev||[],tot=rev.map(r=>SER.reduce((s,x)=>s+Number(r[x[0]]||0),0)),max=Math.max(100,Math.ceil(Math.max(...tot,0)/100)*100);
+  const W=640,H=220,pl=56,pr=10,pt=12,pb=26,y=v=>pt+(H-pt-pb)*(1-v/max),bw=(W-pl-pr)/Math.max(1,rev.length);
+  const chart=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Revenus par mois et par source, sur 6 mois" style="width:100%;height:auto">
+    <g class="gl">${[0,max/2,max].map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}"/><text x="${pl-6}" y="${y(t)+3}" text-anchor="end">${fmt(t)} €</text>`).join('')}</g>
+    ${rev.map((r,i)=>{let acc=0;return SER.map(([k,,c])=>{const v=Number(r[k]||0);if(!v)return '';const y0=y(acc),y1=y(acc+v);acc+=v;return `<rect x="${pl+i*bw+10}" y="${y1}" width="${bw-20}" height="${y0-y1}" fill="${c}" stroke="#17142A" stroke-width="1.5"/>`;}).join('')+`<text x="${pl+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${new Date(r.m).toLocaleDateString('fr-FR',{month:'short'})}</text>${tot[i]?`<text x="${pl+i*bw+bw/2}" y="${y(tot[i])-5}" text-anchor="middle" style="fill:#17142A;font-weight:700">${fmt(tot[i])}</text>`:''}`;}).join('')}</svg>`;
+  const ist={paid:['Payée','good'],pending:['En attente',''],late:['En retard','bad']};
+  return head('Partenaires','Revenus','Encaissements par source. Les abonnements Plus apparaîtront quand le paiement sera branché.')+`
+  <div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><small>Abonnements Plus / mois</small><b>${eur(mrr)}</b><span class="d">${d.subs} abonnés</span></div>
+    <div class="kpi"><small>Encaissé (factures)</small><b>${eur(paid)}</b><span class="d">${inv.filter(i=>i.status==='paid').length} factures payées</span></div>
+    <div class="kpi ${inv.some(i=>i.status==='late')?'alert':''}"><small>À encaisser</small><b>${eur(due)}</b><span class="d">${inv.filter(i=>i.status==='late').length} en retard</span></div>
+    <div class="kpi"><small>Sponsors</small><b>${d.sponsors.length}</b><span class="d">${d.sponsors.filter(s=>s.status==='Signé').length} signés</span></div>
+  </div>
+  <div class="grid">
+    <section class="card c12"><div class="card-h"><h2>Revenus par mois</h2><div class="legend">${SER.map(s=>`<span><i style="background:${s[2]}"></i>${s[1]}</span>`).join('')}</div></div>${chart}</section>
+    <section class="c8"><div class="card-h" style="margin-bottom:10px"><h2>Factures</h2></div>${inv.length?`<div class="tblw"><table class="tbl"><thead><tr><th>N°</th><th>Client</th><th>Type</th><th class="num">Montant</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${inv.map(i=>`<tr><td class="mono">${esc(i.id)}</td><td><b>${esc(i.client)}</b></td><td>${esc(i.type)}</td><td class="num">${eur(i.amount)}</td><td>${dShort(i.due)}</td><td><span class="badge ${ist[i.status][1]}">${ist[i.status][0]}</span></td>
+        <td class="act">${i.status!=='paid'?`<button class="btn sm" type="button" data-act="inv" data-a="paid:${i.id}">Marquer payée</button>${i.status==='late'?` <button class="btn sm sun" type="button" data-act="inv" data-a="remind:${i.id}">Noter une relance</button>`:''}`:''}</td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="empty"><b>Aucune facture</b></div>'}</section>
+    <section class="card c4"><h2>Nouvelle facture</h2><form data-form="invoice" class="stack" novalidate>
+      <div class="field"><label for="ivC">Client</label><input class="input" id="ivC" name="client" maxlength="80"></div>
+      <div class="field"><label for="ivT">Type</label><select class="input" id="ivT" name="type"><option>Licence campus</option><option>Événement BDE</option><option>Team building</option><option>Sponsoring</option></select></div>
+      <div class="fgrid"><div class="field"><label for="ivA">Montant (€)</label><input class="input" id="ivA" name="amount" type="number" min="1" step="1"></div><div class="field"><label for="ivD">Échéance</label><input class="input" id="ivD" name="due" type="date" value="${new Date(Date.now()+30*DAY).toISOString().slice(0,10)}"></div></div>
+      <button class="btn primary" type="submit">Créer</button><p class="tiny">Suivi interne. La facture légale reste à émettre depuis ton outil de facturation.</p></form></section>
+    <section class="c8"><div class="card-h" style="margin-bottom:10px"><h2>Sponsors</h2></div>${d.sponsors.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Marque</th><th>Contrat</th><th>Période</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>
+      ${d.sponsors.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.contract)}</td><td>${esc(s.period)}</td><td class="num">${eur(s.amount)}</td><td><span class="badge ${s.status==='Signé'?'good':'warn'}">${esc(s.status)}</span></td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="empty"><b>Aucun sponsor</b></div>'}</section>
+    <section class="card c4"><h2>Nouveau sponsor</h2><form data-form="sponsor" class="stack" novalidate>
+      <div class="field"><label for="spN">Marque</label><input class="input" id="spN" name="name" maxlength="60"></div>
+      <div class="field"><label for="spC">Contrat</label><input class="input" id="spC" name="contract" maxlength="80" placeholder="ex. Tournoi de rentrée"></div>
+      <div class="fgrid"><div class="field"><label for="spP">Période</label><input class="input" id="spP" name="period" maxlength="40"></div><div class="field"><label for="spA">Montant (€)</label><input class="input" id="spA" name="amount" type="number" min="0" step="1"></div></div>
+      <div class="field"><label for="spS">Statut</label><select class="input" id="spS" name="status"><option>En négociation</option><option>Signé</option></select></div>
+      <button class="btn primary" type="submit">Ajouter</button></form></section>
+  </div>`;
+};
+
+/* ========================= team & audit ========================= */
+V.team=()=>{
+  const t=S.d.team,log=S.d.log;if(!t)return head('Administration','Équipe & journal','')+loading();
+  return head('Administration','Équipe & journal','Qui peut faire quoi, et la trace de chaque action.')+`
+  <div class="grid">
+    <section class="c8"><div class="tblw"><table class="tbl"><thead><tr><th>Membre</th><th>Rôle</th><th>Double authentification</th><th>Dernière connexion</th><th></th></tr></thead><tbody>
+      ${t.admins.map(a=>`<tr><td><b>${esc(a.name)}</b>${a.me?' <span class="badge ink">toi</span>':''}<span class="sub">${esc(a.mail)}</span></td>
+        <td><select class="input" style="height:32px" data-ch="adminRole" data-id="${a.id}" aria-label="Rôle de ${esc(a.name)}" ${a.me?'disabled':''}>${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${a.role===k?'selected':''}>${v}</option>`).join('')}</select></td>
+        <td>${a.tfa?'<span class="badge good">Activée</span>':'<span class="badge warn">À activer</span>'}</td><td>${a.last?ago(a.last):'—'}</td><td class="act">${a.me?'':`<button class="btn sm ghost" type="button" data-act="askRemove" data-a="${a.id}" data-n="${esc(a.name)}">Retirer</button>`}</td></tr>`).join('')}
+      ${t.invites.map(i=>`<tr><td><b>${esc(i.mail)}</b><span class="sub">Invitation en attente</span></td><td>${ROLES[i.role]}</td><td>—</td><td>—</td><td class="act"><button class="btn sm ghost" type="button" data-act="cancelInvite" data-a="${esc(i.mail)}">Annuler</button></td></tr>`).join('')}
+    </tbody></table></div><p class="tiny" style="margin-top:8px">La console impose la double authentification à chaque connexion : un membre sans application d’authentification ne peut rien faire.</p></section>
+    <section class="card c4"><h2>Inviter un membre</h2><form data-form="admin" class="stack" novalidate>
+      <div class="field"><label for="adMail">E-mail</label><input class="input" id="adMail" name="mail" type="email"></div>
+      <div class="field"><label for="adRole">Rôle</label><select class="input" id="adRole" name="role">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k==='mod'?'selected':''}>${v}</option>`).join('')}</select></div>
+      <button class="btn primary" type="submit">Créer l’invitation</button>
+      <p class="tiny">La personne crée un compte joueur avec cette adresse (ou utilise le sien), confirme son e-mail, puis se connecte ici : le rôle s’applique automatiquement. Aucun e-mail n’est envoyé par la console, préviens-la toi-même.</p></form></section>
+    <section class="card c12"><div class="card-h"><h2>Droits par rôle</h2></div><div class="tblw"><table class="tbl perm"><thead><tr><th>Section</th>${Object.values(ROLES).map(r=>`<th style="text-align:center">${r}</th>`).join('')}</tr></thead><tbody>
+      ${SECTIONS.map(s=>`<tr><td>${s[1]}</td>${Object.keys(ROLES).map(k=>`<td>${k==='super'||s[3].includes(k)?'<span style="color:var(--good)">'+ic('check',16)+'</span>':'<span class="mute">—</span>'}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div></section>
+    <section class="card c12"><div class="card-h"><h2>Journal d’audit</h2><div class="row"><div class="search" style="min-width:220px">${ic('search',16)}<input class="input" id="logq" data-in="logq" value="${esc(S.ui.logq)}" placeholder="Filtrer le journal" aria-label="Filtrer le journal"></div></div></div>
+      <div id="logBox">${logList(log)}</div><p class="tiny">Le journal ne peut être ni modifié ni effacé depuis le web, même par un Super admin.</p></section>
+  </div>`;
+};
+
+/* ========================= layer ========================= */
+function confirmHTML(c){
+  return `<div class="m-h"><div><h2>${esc(c.title)}</h2><p>${esc(c.body)}</p></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
+  ${c.reason?`<div class="field"><label for="cfReason">Motif (obligatoire)</label><select class="input" id="cfReason">${MOTIFS.map(m=>`<option>${m}</option>`).join('')}</select></div><div class="field"><label for="cfNote">Précisions</label><textarea class="input" id="cfNote" placeholder="Ce que l’équipe doit savoir"></textarea></div>`:''}
+  ${c.word?`<div class="field"><label for="cfType">Tape <b>${esc(c.word)}</b> pour confirmer</label><input class="input mono" id="cfType" autocomplete="off"></div><p class="tiny" id="cfErr" style="color:var(--bad);font-weight:600"></p>`:''}
+  <div class="row"><button class="btn ${c.danger?'danger':'primary'}" type="button" data-act="confirmYes">${esc(c.ok)}</button><button class="btn ghost" type="button" data-act="close">Annuler</button></div>`;
+}
+function renderLayer(){
+  const Lr=S.ui.layer,el=$('#layer');
+  if(!Lr){el.innerHTML='';return;}
+  let body='',cls='modal';
+  if(Lr.type==='player'){cls='drawer';body=playerDrawer();}
+  else if(Lr.type==='q')body=qEditor(Lr.id);
+  else if(Lr.type==='comp')body=compForm();
+  else if(Lr.type==='school')body=schoolForm(Lr.id);
+  else if(Lr.type==='confirm')body=confirmHTML(Lr);
+  el.innerHTML=`<div class="scrim" data-act="scrim"></div><div class="${cls}" role="dialog" aria-modal="true">${body}</div>`;
+}
+function render(){
+  const ae=document.activeElement,keep=ae&&ae.id&&$('#main').contains(ae)?{id:ae.id,s:ae.selectionStart,e:ae.selectionEnd}:null;
+  $('#rail').innerHTML=railHTML();$('#top').innerHTML=topHTML();
+  if(S.auth.stage!=='ready'){$('#main').innerHTML=gateHTML();$('#layer').innerHTML='';return;}
+  const sec=S.ui.sec;
+  $('#main').innerHTML=(S.d.err?`<div class="empty" style="border-color:var(--bad);background:var(--bad-soft);margin-bottom:14px"><b>Chargement impossible</b>${esc(S.d.err)}<button class="btn sm" type="button" data-act="sec" data-a="${sec}">Réessayer</button></div>`:'')+(can(sec)?V[sec]():`<div class="denied">${ic('lock',28)}<h2>Accès refusé pour le rôle ${ROLES[S.role]}</h2></div>`);
+  renderLayer();
+  if(keep){const n=document.getElementById(keep.id);if(n){n.focus();try{n.setSelectionRange(keep.s,keep.e);}catch(e){}}}
+}
+
+/* ========================= actions ========================= */
+const openLayer=l=>{S.ui.layer=l;renderLayer();const f=$('#layer .modal input:not([type=radio]),#layer .drawer button.x');if(f)setTimeout(()=>{try{f.focus();}catch(e){}},30);};
+const closeLayer=()=>{S.ui.layer=null;renderLayer();};
+const confirmBox=o=>openLayer(Object.assign({},o,{type:'confirm'}));
+async function openPlayer(id){S.d.player=null;openLayer({type:'player',id});try{S.d.player=await rpc('admin_player',{p_id:id});}catch(e){toast(errText(e));}if(S.ui.layer&&S.ui.layer.type==='player')renderLayer();}
+async function playerAction(action,args){
+  const id=S.ui.layer.id;
+  try{S.d.player=await rpc('admin_player_action',{p_id:id,p_action:action,p_args:args||{}});renderLayer();refreshCounts();if(S.ui.sec==='players'){await loadPlayers();render();}return true;}
+  catch(e){toast(errText(e));return false;}
+}
+let plTimer=0;
+const ACT={
+  sec:a=>{if(!can(a))return;S.ui.sec=a;S.ui.layer=null;loadSection();try{window.scrollTo({top:0});}catch(e){}},
+  gate:a=>{S.auth={stage:a};render();},
+  logout:async()=>{await sb.auth.signOut();S.role=null;S.d={};S.auth={stage:'login'};render();},
+  player:a=>openPlayer(a),
+  close:closeLayer,scrim:closeLayer,
+  reveal:async a=>{try{S.ui.reveal[a]=await rpc('admin_reveal_email',{p_id:a});renderLayer();}catch(e){toast(errText(e));}},
+  pAct:async a=>{
+    if(a==='rename'){const v=($('#dRename').value||'').trim();if(await playerAction('rename',{name:v}))toast('Pseudo modifié.');}
+    if(a==='suspend'){if(await playerAction('suspend',{days:+$('#dDur').value,motif:$('#dMot').value}))toast('Joueur suspendu.');}
+    if(a==='lift'){if(await playerAction('lift'))toast('Sanction levée.');}
+    if(a==='note'){if(await playerAction('note',{text:$('#dNotes').value}))toast('Note enregistrée.');}
+    if(a==='verify'||a==='unverify'){if(await playerAction('verify',{value:a==='verify'}))toast(a==='verify'?'Étudiant vérifié.':'Vérification retirée.');}
+  },
+  askBan:()=>{const p=S.d.player;confirmBox({kind:'ban',pid:p.id,title:`Bannir ${p.name} ?`,body:'Le compte ne pourra plus jouer ni apparaître dans les classements.',ok:'Bannir',danger:true,reason:true});},
+  askResetScores:()=>{const p=S.d.player;confirmBox({kind:'resetScores',pid:p.id,title:`Réinitialiser les scores de ${p.name} ?`,body:'Ses parties sont archivées et retirées des classements. Son niveau et son XP restent.',ok:'Réinitialiser',danger:true});},
+  sort:a=>{const f=S.ui.pl;if(f.sort===a)f.dir*=-1;else{f.sort=a;f.dir=a==='name'?1:-1;}f.page=0;loadPlayers().then(render).catch(e=>toast(errText(e)));},
+  page:a=>{S.ui.pl.page+=+a;loadPlayers().then(render).catch(e=>toast(errText(e)));},
+  plReset:()=>{S.ui.pl={q:'',status:'all',school:'all',ver:'all',sort:'last',dir:-1,page:0};loadSection();},
+  modTab:a=>{S.ui.mod=a;S.d.reports=null;loadSection();},acTab:a=>{S.ui.ac=a;S.d.flags=null;loadSection();},
+  ctTab:a=>{S.ui.ct=a;loadSection();},wlTab:a=>{S.ui.wl=a;S.d.words=null;loadSection();},scTab:a=>{S.ui.sc=a;render();},cpTab:a=>{S.ui.cp=a;render();},
+  rep:async a=>{const [id,w]=a.split(':');try{await act('admin_report_action',{p_id:id,p_action:w},w==='ignore'?'Signalement classé.':w==='warn'?'Avertissement enregistré. Préviens le joueur si besoin.':'Joueur suspendu 7 jours.');loadSection();}catch(e){}},
+  flag:async a=>{const [id,w]=a.split(':');try{await act('admin_flag_action',{p_id:id,p_action:w},w==='valid'?'Score validé : il rejoint les classements.':w==='void'?'Score annulé.':'Score annulé et joueur suspendu 30 jours.');loadSection();}catch(e){}},
+  ruleOn:(a,el)=>{S.d.rules[a].on=el.checked;},
+  autoVoid:(a,el)=>{S.d.rules.autoVoid=el.checked;},
+  saveRules:async()=>{const p={autoVoid:!!S.d.rules.autoVoid};Object.keys(RULES_META).forEach(k=>{p[k]={on:!!S.d.rules[k].on,val:parseFloat($('#rule_'+k).value)};});
+    try{S.d.rules=await act('admin_set_rules',{p},'Règles enregistrées.');render();}catch(e){}},
+  askLbReset:()=>{const sel=$('#lbReset');confirmBox({kind:'lbReset',board:sel.value,title:`Réinitialiser « ${sel.options[sel.selectedIndex].text} » ?`,body:'Le classement repart de zéro pour tous les joueurs.',ok:'Réinitialiser',danger:true,word:'réinitialiser'});},
+  qEdit:a=>openLayer({type:'q',id:a||null}),
+  qAct:async a=>{const [id,w]=a.split(':');try{await act('admin_question_action',{p_id:id,p_action:w});loadSection();}catch(e){}},
+  askQDel:a=>{const q=S.d.questions.find(x=>x.id===a);confirmBox({kind:'qDel',qid:a,title:'Supprimer cette question ?',body:`« ${q.q.fr} » sera retirée du jeu.`,ok:'Supprimer',danger:true});},
+  wDel:async a=>{try{await act('admin_word',{p_lang:S.ui.wl,p_word:a,p_cat:null,p_action:'delete'},`${a} supprimé.`);loadSection();}catch(e){}},
+  gSet:async(a,el)=>{const [id,field]=a.split(':');try{await act('admin_set_game',{p_id:id,p_field:field,p_val:el.checked});}catch(e){el.checked=!el.checked;}loadSection();},
+  compNew:()=>openLayer({type:'comp'}),
+  askCompCancel:a=>{const c=S.d.comps.comps.find(x=>x.id===a);confirmBox({kind:'compCancel',cid:a,title:`Annuler « ${c.name} » ?`,body:'La compétition reste visible comme annulée.',ok:'Annuler la compétition',danger:true});},
+  compAct:async a=>{const [id,w]=a.split(':');try{await act('admin_comp_action',{p_id:id,p_action:w},'Copie créée, une semaine plus tard.');loadSection();}catch(e){}},
+  saveDaily:async()=>{const p=S.d.comps.daily.map((x,i)=>({date:x.date,game:$('#dg'+i).value,track:$('#dt'+i)?+$('#dt'+i).value:0}));try{await act('admin_set_daily',{p},'Planning enregistré.');loadSection();}catch(e){}},
+  seasonDate:async()=>{const v=$('#seasonEnd').value;if(!v){toast('Choisis une date.');return;}try{await act('admin_season_action',{p_action:'set_end',p_end:new Date(v+'T23:00:00').toISOString()},'Date de fin enregistrée.');loadSection();}catch(e){}},
+  askSeasonClose:()=>confirmBox({kind:'seasonClose',title:'Clôturer la saison maintenant ?',body:'La saison est figée, chaque cote revient à mi-chemin de 1 000 et une nouvelle saison de 90 jours commence.',ok:'Clôturer la saison',danger:true,word:'clôturer'}),
+  verif:async a=>{const [id,w]=a.split(':');try{await act('admin_verif_action',{p_id:id,p_action:w},w==='ok'?'Étudiant vérifié.':'Demande refusée.');loadSection();}catch(e){}},
+  mgrDel:async a=>{try{await act('admin_manager',{p_action:'remove',p:{id:a}},'Responsable retiré.');loadSection();}catch(e){}},
+  schoolEdit:a=>openLayer({type:'school',id:a||null}),
+  inv:async a=>{const [w,id]=a.split(/:(.+)/);try{await act('admin_invoice',{p_action:w,p:{id}},w==='paid'?'Facture marquée payée.':'Relance notée au journal.');loadSection();}catch(e){}},
+  askRemove:(a,el)=>confirmBox({kind:'removeAdmin',uid:a,title:`Retirer ${el.dataset.n} de l’équipe ?`,body:'Son compte joueur reste actif, mais il perd l’accès à la console.',ok:'Retirer',danger:true}),
+  cancelInvite:async a=>{try{S.d.team=await act('admin_team_action',{p_action:'cancel_invite',p:{mail:a}},'Invitation annulée.');render();}catch(e){}},
+  confirmYes:async()=>{
+    const c=S.ui.layer;if(!c||c.type!=='confirm')return;
+    if(c.word){const v=($('#cfType').value||'').trim().toLowerCase();if(v!==c.word){$('#cfErr').textContent=`Tape exactement « ${c.word} ».`;return;}}
+    try{
+      if(c.kind==='ban'){S.ui.layer={type:'player',id:c.pid};await playerAction('ban',{motif:$('#cfReason')?$('#cfReason').value:'',note:''});toast('Joueur banni.');return;}
+      if(c.kind==='resetScores'){S.ui.layer={type:'player',id:c.pid};await playerAction('reset_scores');toast('Scores réinitialisés.');return;}
+      if(c.kind==='lbReset')await act('admin_reset_board',{p_board:c.board},'Classement réinitialisé.');
+      if(c.kind==='qDel')await act('admin_question_action',{p_id:c.qid,p_action:'delete'},'Question supprimée.');
+      if(c.kind==='compCancel')await act('admin_comp_action',{p_id:c.cid,p_action:'cancel'},'Compétition annulée.');
+      if(c.kind==='seasonClose')await act('admin_season_action',{p_action:'close'},'Nouvelle saison lancée.');
+      if(c.kind==='removeAdmin')S.d.team=await act('admin_team_action',{p_action:'remove',p:{id:c.uid}},'Membre retiré.');
+      closeLayer();loadSection();
+    }catch(e){}
+  }
+};
+
+/* ========================= events ========================= */
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el||el.disabled)return;const fn=ACT[el.dataset.act];if(fn)fn(el.dataset.a,el,e);});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&S.ui.layer)closeLayer();
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('tr[data-act]')){e.preventDefault();e.target.click();}
+});
+document.addEventListener('change',e=>{
+  const k=e.target.dataset&&e.target.dataset.ch;if(!k)return;const v=e.target.value,f=S.ui.pl;
+  if(['pls','plsc','plv'].includes(k)){if(k==='pls')f.status=v;if(k==='plsc')f.school=v;if(k==='plv')f.ver=v;f.page=0;loadPlayers().then(render).catch(err=>toast(errText(err)));}
+  if(k==='qcat'){S.ui.qf.cat=v;render();}if(k==='qst'){S.ui.qf.status=v;render();}
+  if(k==='dailyGame'){S.d.comps.daily[+e.target.dataset.i].game=v;render();}
+  if(k==='adminRole'){act('admin_team_action',{p_action:'role',p:{id:e.target.dataset.id,role:v}},'Rôle modifié.').then(t=>{S.d.team=t;render();}).catch(()=>loadSection());}
+});
+document.addEventListener('input',e=>{
+  const k=e.target.dataset&&e.target.dataset.in;if(!k)return;const v=e.target.value;
+  if(k==='plq'){S.ui.pl.q=v;S.ui.pl.page=0;clearTimeout(plTimer);plTimer=setTimeout(()=>loadPlayers().then(()=>{$('#plTable').innerHTML=playersTable();}).catch(err=>toast(errText(err))),300);}
+  if(k==='qq'){S.ui.qf.q=v;render();}
+  if(k==='logq'){S.ui.logq=v;clearTimeout(plTimer);plTimer=setTimeout(async()=>{try{S.d.log=await rpc('admin_log',{p_q:v,p_limit:100});$('#logBox').innerHTML=logList(S.d.log);}catch(err){toast(errText(err));}},300);}
+});
+document.addEventListener('submit',async e=>{
+  const f=e.target,k=f.dataset.form;if(!k)return;e.preventDefault();
+  const F=n=>(f.elements[n]?String(f.elements[n].value):'').trim(),btn=f.querySelector('button[type=submit]');
+  const gateErr=m=>{S.auth.err=m;render();};
+  if(k==='login'){btn.disabled=true;const {error}=await sb.auth.signInWithPassword({email:F('email'),password:f.elements.pw.value});
+    if(error){S.auth={stage:'login',err:/confirm/i.test(error.message)?'Confirme d’abord ton e-mail.':/invalid/i.test(error.message)?'E-mail ou mot de passe incorrect.':errText(error)};render();return;}
+    afterLogin();return;}
+  if(k==='recover'){await sb.auth.resetPasswordForEmail(F('email'),{redirectTo:location.origin+location.pathname});S.auth={stage:'login',err:'Si un compte existe, un lien de réinitialisation a été envoyé.'};render();return;}
+  if(k==='newpw'){const pw=f.elements.pw.value;if(pw.length<12){gateErr('Utilise au moins 12 caractères pour un compte d’équipe.');return;}const {error}=await sb.auth.updateUser({password:pw});if(error){gateErr(errText(error));return;}afterLogin();return;}
+  if(k==='mfa'){const code=F('code').replace(/\s/g,'');if(!/^\d{6}$/.test(code)){gateErr('Saisis les 6 chiffres affichés dans ton application.');return;}btn.disabled=true;
+    const {error}=await sb.auth.mfa.challengeAndVerify({factorId:S.auth.factorId,code});
+    if(error){S.auth.err='Code incorrect ou expiré. Réessaie avec le code suivant.';render();return;}
+    afterLogin();return;}
+  const d=S.d;
+  try{
+    if(k==='question'){
+      const a=[0,1,2,3].map(i=>({fr:F('a'+i+'fr'),en:F('a'+i+'en')})),corr=+(f.querySelector('input[name=correct]:checked')||{value:0}).value;
+      const p={id:f.dataset.id||null,cat:F('cat'),status:F('status'),q:{fr:F('qfr'),en:F('qen')},a,correct:corr};
+      try{await rpc('admin_save_question',{p});}catch(err){S.ui.layer.err=errText(err);S.ui.layer.draft=p;renderLayer();return;}
+      closeLayer();toast('Question enregistrée.');refreshCounts();loadSection();
+    }
+    if(k==='word'){const r=await act('admin_word',{p_lang:S.ui.wl,p_word:F('w'),p_cat:F('c'),p_action:'add'});toast(r.anagram?`${r.word} ajouté. Anagramme de ${r.anagram} : les deux sont acceptés.`:`${r.word} ajouté.`);loadSection();}
+    if(k==='comp'){
+      const v={name:F('name'),game:F('game'),format:F('format'),start:F('start'),end:F('end'),vis:F('vis'),school:F('school'),sponsor:F('sponsor'),reward:F('reward')};
+      if(!v.start||!v.end){S.ui.layer.err='Choisis les dates.';S.ui.layer.vals=v;renderLayer();return;}
+      try{await rpc('admin_save_comp',{p:Object.assign({},v,{start:new Date(v.start+'T09:00:00').toISOString(),end:new Date(v.end+'T23:00:00').toISOString()})});}
+      catch(err){S.ui.layer.err=errText(err);S.ui.layer.vals=v;renderLayer();return;}
+      closeLayer();S.ui.cp='list';toast('Compétition créée.');loadSection();
+    }
+    if(k==='school'){
+      const v={id:f.dataset.id||null,name:F('name'),short:F('short').toUpperCase(),domain:F('domain').toLowerCase(),city:F('city'),country:F('country'),status:F('status'),col:(f.querySelector('input[name=col]:checked')||{value:'#5B4BFF'}).value};
+      try{await rpc('admin_save_school',{p:v});}catch(err){S.ui.layer.err=errText(err);S.ui.layer.vals=v;renderLayer();return;}
+      closeLayer();toast('Établissement enregistré.');loadSection();
+    }
+    if(k==='mgr'){await act('admin_manager',{p_action:'add',p:{name:F('name'),email:F('mail'),school:F('school'),role:F('role')}},'Responsable ajouté.');loadSection();}
+    if(k==='invoice'){await act('admin_invoice',{p_action:'add',p:{client:F('client'),type:F('type'),amount:+F('amount'),due:F('due')}},'Facture créée.');loadSection();}
+    if(k==='sponsor'){await act('admin_sponsor',{p:{name:F('name'),contract:F('contract'),period:F('period'),amount:+F('amount')||0,status:F('status')}},'Sponsor ajouté.');loadSection();}
+    if(k==='admin'){S.d.team=await act('admin_team_action',{p_action:'invite',p:{mail:F('mail'),role:F('role')}},'Invitation créée. Préviens la personne.');loadSection();}
+  }catch(err){}
+});
+
+/* ========================= démarrage ========================= */
+if(CONFIGURED){
+  sb.auth.onAuthStateChange((ev)=>{if(ev==='PASSWORD_RECOVERY'){S.auth={stage:'newpw'};render();}if(ev==='SIGNED_OUT'){S.role=null;S.auth={stage:'login'};render();}});
+  sb.auth.getSession().then(({data})=>{if(data&&data.session)afterLogin();else{S.auth={stage:'login'};render();}});
+}else{S.auth={stage:'config'};render();}
+})();
+</script>
+</html>
