@@ -28,5 +28,5 @@ mkdir -p admin
   cat build/admin/b2.core.js build/admin/b3.live.js build/admin/b4.views.js build/admin/b5.app.js
   echo '</html>'
 } > admin/index.html
-cat supabase/src/01_schema.sql supabase/src/02_player.sql supabase/src/03_admin.sql supabase/src/04_seed.sql supabase/src/06_shop.sql supabase/src/07_leagues.sql supabase/src/09_grants.sql > supabase/schema.sql
+cat supabase/src/01_schema.sql supabase/src/02_player.sql supabase/src/03_admin.sql supabase/src/04_seed.sql supabase/src/06_shop.sql supabase/src/07_leagues.sql supabase/src/08_social.sql supabase/src/09_grants.sql > supabase/schema.sql
 echo "built index.html, admin/index.html, supabase/schema.sql"

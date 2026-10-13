@@ -401,3 +401,80 @@ alter table public.leagues enable row level security;
 alter table public.league_members enable row level security;
 revoke all on public.leagues from anon, authenticated;
 revoke all on public.league_members from anon, authenticated;
+
+-- ---------- objets de jeu (voitures, blocs, cibles) ----------
+alter table public.shop_items drop constraint if exists shop_items_kind_check;
+alter table public.shop_items add constraint shop_items_kind_check check (kind in ('avatar','frame','skin','car_model','car_paint','car_trail','stack','aim'));
+-- équipement de jeu choisi par le joueur, ex. {"car_model":"kart","car_paint":"flames","stack":"candy"}
+alter table public.profiles add column if not exists gear jsonb not null default '{}';
+insert into public.shop_items(id, kind, ref, name_fr, name_en, price, sort) values
+  ('car_model:kart',   'car_model', 'kart',   'Kart',            'Kart',            250, 40),
+  ('car_model:f1',     'car_model', 'f1',     'Formule',         'Formula',         400, 41),
+  ('car_model:pickup', 'car_model', 'pickup', 'Pick-up',         'Pickup',          300, 42),
+  ('car_model:rally',  'car_model', 'rally',  'Rallye',          'Rally',           300, 43),
+  ('car_model:muscle', 'car_model', 'muscle', 'Muscle car',      'Muscle car',      350, 44),
+  ('car_paint:flames', 'car_paint', 'flames', 'Flammes',         'Flames',          200, 50),
+  ('car_paint:checker','car_paint', 'checker','Damier',          'Checkered',       200, 51),
+  ('car_paint:stripes','car_paint', 'stripes','Bandes de course','Racing stripes',  150, 52),
+  ('car_paint:camo',   'car_paint', 'camo',   'Camouflage',      'Camo',            150, 53),
+  ('car_paint:chrome', 'car_paint', 'chrome', 'Chrome',          'Chrome',          300, 54),
+  ('car_paint:galaxy', 'car_paint', 'galaxy', 'Galaxie',         'Galaxy',          350, 55),
+  ('car_trail:neon',   'car_trail', 'neon',   'Traînée néon',    'Neon trail',      250, 60),
+  ('car_trail:rainbow','car_trail', 'rainbow','Arc-en-ciel',     'Rainbow',         350, 61),
+  ('car_trail:smoke',  'car_trail', 'smoke',  'Fumée rose',      'Pink smoke',      150, 62),
+  ('car_trail:sparks', 'car_trail', 'sparks', 'Étincelles',      'Sparks',          200, 63),
+  ('car_trail:hearts', 'car_trail', 'hearts', 'Cœurs',           'Hearts',          200, 64),
+  ('stack:candy',      'stack',     'candy',  'Blocs bonbons',   'Candy blocks',    200, 70),
+  ('stack:glass',      'stack',     'glass',  'Blocs de verre',  'Glass blocks',    250, 71),
+  ('stack:neon',       'stack',     'neon',   'Blocs néon',      'Neon blocks',     300, 72),
+  ('stack:gold',       'stack',     'gold',   'Lingots d’or',    'Gold bars',       400, 73),
+  ('aim:ocean',        'aim',       'ocean',  'Bulles océan',    'Ocean bubbles',   200, 80),
+  ('aim:melon',        'aim',       'melon',  'Pastèques',       'Watermelons',     200, 81),
+  ('aim:donut',        'aim',       'donut',  'Donuts',          'Donuts',          250, 82),
+  ('aim:planet',       'aim',       'planet', 'Planètes',        'Planets',         300, 83)
+on conflict (id) do nothing;
+
+-- ---------- défis directs : je choisis mon adversaire ----------
+create table if not exists public.challenges(
+  id uuid primary key default gen_random_uuid(),
+  from_user uuid not null references public.profiles(id) on delete cascade,
+  to_user uuid not null references public.profiles(id) on delete cascade,
+  sk text not null,
+  seed bigint not null,
+  cat text not null default 'mix',
+  from_score numeric not null,
+  from_run uuid,
+  to_score numeric,
+  to_run uuid,
+  status text not null default 'open' check (status in ('open','playing','done','declined','expired')),
+  winner uuid,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '7 days',
+  played_at timestamptz,
+  done_at timestamptz
+);
+create index if not exists challenges_to on public.challenges (to_user, status);
+create index if not exists challenges_from on public.challenges (from_user, created_at desc);
+
+-- ---------- duels en direct (les deux joueurs connectés en même temps) ----------
+create table if not exists public.live_matches(
+  id uuid primary key default gen_random_uuid(),
+  a uuid not null references public.profiles(id) on delete cascade,   -- celui qui invite
+  b uuid not null references public.profiles(id) on delete cascade,   -- l'invité
+  sk text not null,
+  seed bigint not null,
+  status text not null default 'invited' check (status in ('invited','ready','done','declined','cancelled','expired')),
+  start_at timestamptz,
+  a_run uuid, b_run uuid,
+  a_score numeric, b_score numeric,
+  a_done boolean not null default false, b_done boolean not null default false,
+  winner uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists live_matches_b on public.live_matches (b, status);
+create index if not exists live_matches_a on public.live_matches (a, status);
+alter table public.challenges enable row level security;
+alter table public.live_matches enable row level security;
+revoke all on public.challenges from anon, authenticated;
+revoke all on public.live_matches from anon, authenticated;

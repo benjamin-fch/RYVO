@@ -79,9 +79,15 @@ Depuis la console : questions de quiz, mots, jeu du jour, compétitions. Le scri
 
 Tout est gratuit pour jouer. Les revenus viennent des joueurs eux-mêmes, et **rien de ce qui se vend ne fait gagner** : pas d'essais en plus, pas de bonus, pas de cote.
 
-1. **Boutique de cosmétiques.** Avatars, cadres et thèmes, visibles par tous dans les classements. Ils s'achètent avec des **gemmes**, vendues par packs (0,99 €, 4,99 €, 9,99 € par défaut, modifiables dans la console).
+1. **Boutique de cosmétiques.** Avatars, cadres et thèmes, visibles par tous dans les classements ; pour Neon Sprint, des modèles de voiture (kart, Formule, pick-up, rallye, muscle car), des peintures et des traînées ; des blocs pour Skyline Stack et des cibles pour Pop Shot. Même vitesse et mêmes règles pour tous : c'est uniquement visuel. Ils s'achètent avec des **gemmes**, vendues par packs (0,99 €, 4,99 €, 9,99 € par défaut, modifiables dans la console).
 2. **Ligues privées.** N'importe quel joueur crée une ligue pour son groupe (amis, promo, asso, club) et partage un code ou un lien. Le classement prend les vraies parties vérifiées par le serveur pendant la période. Gratuit jusqu'à 20 joueurs et 14 jours ; **Ligue+** (300 gemmes) : 200 joueurs, 60 jours, couleur, export CSV.
 3. **Pubs récompensées.** Le joueur choisit de regarder une courte pub pour gagner 10 gemmes (5 fois par jour maximum). Jamais de pub pendant une partie.
+
+### Choisir son adversaire
+
+- **Défi direct** : depuis Social (ou « Choisir mon adversaire » dans un duel), tu cherches un joueur par son pseudo ou tu le prends dans la liste des joueurs en ligne. Tu cours tout de suite contre son vrai record, puis il reçoit ton score à battre (7 jours, même circuit et même tirage que toi).
+- **Duel en direct** : avec un joueur en ligne. Il reçoit l'invitation (45 s pour accepter), puis vous partez au même moment, sur le même tirage. En course, tu vois sa voiture en direct. Le gagnant est désigné par le serveur à partir des deux scores vérifiés. Ces duels sont amicaux : ils ne changent pas la cote.
+- La liste « en ligne » et les positions en course passent par **Supabase Realtime** (activé par défaut, rien à régler). Chaque joueur peut se masquer (« Me montrer en ligne » dans Social). Ce qui transite en direct sert uniquement à l'affichage : les invitations, résultats et scores passent toujours par le serveur.
 
 ### Encaisser les achats (Stripe)
 

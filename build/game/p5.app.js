@@ -147,7 +147,9 @@ const ACT={
   /* ---------- boutique ---------- */
   shopTab:a=>{S.ui.shop.tab=a;render();},
   shopGo:a=>{S.ui.shop.tab=a||'avatar';go('shop');},
-  equip:a=>{const it=shopCfg().items.find(i=>i.id===a);if(!it||!ownsItem(it.kind,it.ref))return;ACT[it.kind](it.kind==='avatar'?+it.ref:it.ref);if(S.route==='shop')render();},
+  equip:a=>{const it=shopCfg().items.find(i=>i.id===a);if(!it||!ownsItem(it.kind,it.ref))return;if(GEAR_KINDS.includes(it.kind)){ACT.gear(it.kind,it.ref);return;}ACT[it.kind](it.kind==='avatar'?+it.ref:it.ref);if(S.route==='shop')render();},
+  unequip:a=>{const it=shopCfg().items.find(i=>i.id===a);if(it&&GEAR_KINDS.includes(it.kind))ACT.gear(it.kind,null);},
+  gear:(k,v)=>{const g=Object.assign({},S.data.gear||{});if(v)g[k]=v;else delete g[k];S.data.gear=g;SFX.play('tap');save();render();},
   itemBuy:a=>{S.ui.sheet={type:'itemBuy',id:a};renderLayer();},
   toPacks:()=>{S.ui.sheet=null;renderLayer();if(S.route!=='shop')go('shop');setTimeout(()=>{const n=document.getElementById('packs');if(n)n.scrollIntoView({behavior:'smooth'});},60);},
   itemBuyYes:a=>{const st=S.data,it=shopCfg().items.find(i=>i.id===a);if(!it||ownsItem(it.kind,it.ref))return;

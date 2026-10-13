@@ -27,6 +27,8 @@ function errText(e){
     not_member:['You’re not in this league.','Tu ne fais pas partie de cette ligue.'],owner_cannot_leave:['You created this league: delete it instead of leaving.','Tu as créé cette ligue : supprime-la plutôt que de la quitter.'],
     plus_only:['Available with League+.','Disponible avec Ligue+.'],forbidden:['Only the league’s creator can do that.','Seul le créateur de la ligue peut faire ça.'],bad_board:['Pick a game.','Choisis un jeu.'],
     waiver_required:['Tick the box to get your gems right away.','Coche la case pour recevoir tes gemmes tout de suite.'],unknown_pack:['This pack is no longer available.','Ce pack n’est plus disponible.'],
+    opp_no_score:['This player has no score on this game yet. Pick another game.','Ce joueur n’a pas encore de score sur ce jeu. Choisis-en un autre.'],
+    challenge_closed:['This challenge is no longer open.','Ce défi n’est plus ouvert.'],live_closed:['This live duel is no longer available.','Ce duel en direct n’est plus disponible.'],
     server_error:['Payment couldn’t start. Try again in a moment.','Le paiement n’a pas pu démarrer. Réessaie dans un instant.'],
     last_super_admin:['You are the last super admin: hand over the role before deleting your account.','Tu es le dernier super admin : transmets le rôle avant de supprimer ton compte.']};
   for(const k in T)if(m===k||m.startsWith(k))return L(T[k][0],T[k][1]);
@@ -87,7 +89,7 @@ function liveFeedHTML(){
 function liveDuelPanel(){
   return `<div class="opp"><span class="avw">${face({col:'#17142A',eyes:3,mouth:0,shape:2},48)}</span><div style="min-width:0;flex:1"><b class="num" style="font-size:16px">${L('A real player, picked by the server','Un vrai joueur, choisi par le serveur')}</b>
     <p class="tiny">${L(`RYVO picks a player close to your rating (${S.data.rating} SR) and replays their best run. If nobody qualifies yet, you face the RYVO bot.`,`RYVO choisit un joueur proche de ta cote (${S.data.rating} SR) et rejoue son meilleur résultat. S’il n’y en a pas encore, tu affrontes le bot RYVO.`)}</p></div></div>
-    ${NET.user?'':`<p class="tiny">${L('As a guest you play a practice run with no opponent. Sign in for real duels and to move your rating.','En invité, tu joues une partie d’essai sans adversaire. Connecte-toi pour de vrais duels et faire bouger ta cote.')}</p>`}`;
+    ${NET.user?(S.ui.lobby.game==='cards'?'':`<div class="row" style="margin-top:6px"><button class="btn" type="button" data-act="oppPick">${ic('users',16)}${L('Choose my opponent','Choisir mon adversaire')}</button><span class="tiny">${RT.online.size?`<span class="presence on"></span> ${RT.online.size} ${plural(RT.online.size,'player online','players online','joueur en ligne','joueurs en ligne')}`:''}</span></div>`):`<p class="tiny">${L('As a guest you play a practice run with no opponent. Sign in for real duels and to move your rating.','En invité, tu joues une partie d’essai sans adversaire. Connecte-toi pour de vrais duels et faire bouger ta cote.')}</p>`}`;
 }
 function liveOthers(r){
   const s=r.server||{},st=S.data,sc=SCH[st.school.id];
@@ -96,7 +98,7 @@ function liveOthers(r){
     ${s.rank_world&&s.total_world>1?`<dt>${L('Ahead of','Devant')}</dt><dd>${Math.round((1-(s.rank_world-1)/(s.total_world-1))*100)} % ${L('of players','des joueurs')}</dd>`:''}
     ${s.rank_school?`<dt>${L('School rank','Rang dans l’école')}</dt><dd>#${s.rank_school} / ${s.total_school}</dd>`:''}
     ${r.schoolGain?`<dt>${L('School Cup','Coupe des écoles')}</dt><dd class="good">+${r.schoolGain}${sc?' '+L('for','pour')+' '+esc(sc.short):''}</dd>`:''}
-  </dl>${s.status==='flagged'?`<p class="tiny">${L('Unusual result: a moderator checks it before it counts.','Résultat inhabituel : un modérateur le vérifie avant qu’il compte.')}</p>`:`<p class="tiny">${L('Checked by the server.','Vérifié par le serveur.')}</p>`}</section>`;
+  </dl>${r.live?liveResultHTML(r.live):''}${s.challenge_sent?`<div class="note" style="margin-top:10px">${ic('swords')}<span>${L(`Challenge sent to ${esc(r.oppName||'')}: they have 7 days to beat your score.`,`Défi envoyé à ${esc(r.oppName||'')} : il a 7 jours pour battre ton score.`)}</span></div>`:''}${s.status==='flagged'?`<p class="tiny">${L('Unusual result: a moderator checks it before it counts.','Résultat inhabituel : un modérateur le vérifie avant qu’il compte.')}</p>`:`<p class="tiny">${L('Checked by the server.','Vérifié par le serveur.')}</p>`}</section>`;
 }
 function practiceResult(r){
   const G=GAME[r.g];
@@ -184,7 +186,7 @@ function applyMe(m){
   d.history=(m.runs||[]).map(r=>({g:r.g,sk:r.sk,m:r.m,s:Number(r.s),o:r.o,opp:r.opp,xp:r.xp,dr:r.dr,t:r.t,x:r.x==null?undefined:Number(r.x),w:r.w,st:r.st}));
   d.daily={day:dayKey(),att:Object.fromEntries(GAMES.map(g=>[g.id,Math.max(0,3-((m.daily&&m.daily.used&&m.daily.used[g.id])||0))])),best:Object.fromEntries(Object.entries((m.daily&&m.daily.best)||{}).map(([k,v])=>[k,Number(v)]))};
   d.schoolPts=m.school_pts||0;
-  d.gems=m.gems||0;d.owned=m.owned||[];
+  d.gems=m.gems||0;d.owned=m.owned||[];d.gear=m.gear||{};
   if(m.status==='suspended')toast(errText('suspended:'+m.until));
   checkAch();save();
 }
@@ -232,8 +234,8 @@ if(LIVE){
     let track=opt.track!=null?opt.track:(Lb.game===id?Lb.track:0);if(TRACKS[track].lv>lv)track=0;
     const cat=opt.cat||(Lb.game===id?Lb.cat:'mix');
     try{
-      const run=await rpc('start_run',{p_game:id,p_mode:mode,p_track:track,p_cat:cat,p_lang:LANG});
-      S.game={id,mode,sk:run.sk,track:run.track,cat:run.cat||cat,oppId:null,run};
+      const run=await rpc('start_run',{p_game:id,p_mode:mode,p_track:track,p_cat:cat,p_lang:LANG,p_opp:opt.opp||null,p_challenge:opt.challenge||null,p_live:opt.live||null});
+      S.game={id,mode:run.mode||mode,sk:run.sk,track:run.track,cat:run.cat||cat,oppId:null,run,live:run.live?liveJoin(run.live,run.opp):null};
       Object.assign(S.ui.lobby,{game:id,mode,track:id==='sprint'&&mode!=='daily'?track:Lb.track,cat:id==='brain'&&mode!=='daily'?cat:Lb.cat});
       go('game');
     }catch(e){toast(errText(e));if(/daily|not_daily/.test(e.message))loadMe();}
@@ -241,8 +243,10 @@ if(LIVE){
   };
   makeCtx=function(g){
     if(!g.run)return makeCtxLocal(g);
-    const run=g.run,o=run.opp?{id:run.opp.id||'bot',name:run.opp.name,face:faceOf({avatar:run.opp.avatar,id:run.opp.name}),school:null,rating:run.opp.rating,skill:Number(run.opp.skill)||0.5,best:{}}:null;
+    const run=g.run,showOpp=run.opp&&(!run.live||g.id==='sprint');
+    const o=showOpp?{id:run.opp.id||'bot',name:run.opp.name,face:faceOf({avatar:run.opp.avatar,id:run.opp.name}),frame:run.opp.frame,gear:run.opp.gear||{},school:null,rating:run.opp.rating,skill:Number(run.opp.skill)||0.5,best:{}}:null;
     const ctx={mode:g.mode,opp:o,sk:run.sk,track:run.track,cat:run.cat,rand:rng(Number(run.seed))};
+    if(g.live&&g.id==='sprint')ctx.live=g.live.ctx;
     if(o&&run.opp.score!=null){ctx.oppScore=Number(run.opp.score);if(g.id==='sprint')ctx.oppTime=ctx.oppScore;if(g.id==='reflex')ctx.oppBase=ctx.oppScore-12;}
     if(g.id==='brain'&&run.questions){ctx.questions=run.questions;ctx.answer=(i,k,t)=>rpc('answer_question',{p_run:run.run,p_i:i,p_k:k,p_t:Math.round(t*100)/100});}
     if(g.id==='words'&&run.words){ctx.words=run.words;ctx.wordEvent=(i,kind,guess)=>rpc('word_event',{p_run:run.run,p_i:i,p_kind:kind,p_guess:guess||null});}
@@ -290,6 +294,7 @@ function afterSubmit(res,srv){
     oppScore:srv.opp_score!=null?Number(srv.opp_score):(g.mode==='duel'?null:res.oppScore??null),xp:srv.xp+(srv.mission_xp||0),lvBefore,lvAfter:srv.level,dr:srv.dr,schoolGain:srv.school_gain,ach:newAch,
     details:Object.assign({},res.details,g.id==='brain'&&srv.details?{correct:srv.details.correct,avgT:srv.details.avgT,bestStreak:srv.details.bestStreak}:{}),
     dailyLeft:g.mode==='daily'?attLeft(g.id):null,lastPrev:lastSame?lastSame.s:null,fresh:true,server:srv};
+  if(srv.live&&g.live){g.live.fin(score);S.result.live=srv.live;livePollResult(srv.live.id);}
   invalidate();go('result');loadMe();
 }
 
@@ -543,13 +548,166 @@ if(LIVE){
   },true);
 }
 
+/* ---------- choisir son adversaire : joueurs en ligne, défis directs, duels en direct ---------- */
+const RT={pres:null,inbox:null,online:new Map(),shown:new Set(),waiting:null,poll:0};
+const rtOK=()=>LIVE&&!!(sb&&sb.channel);
+const showOnline=()=>{try{return localStorage.getItem('ryvo.hidden')!=='1';}catch(e){return true;}};
+function rtStart(){
+  if(!rtOK()||!NET.user||RT.pres)return;const uid=NET.user.id;
+  RT.inbox=sb.channel('ryvo-u-'+uid).on('broadcast',{event:'live'},({payload})=>liveSignal(payload||{})).subscribe();
+  if(showOnline()){
+    RT.pres=sb.channel('ryvo-online',{config:{presence:{key:uid}}});
+    RT.pres.on('presence',{event:'sync'},()=>{const st=RT.pres.presenceState();RT.online=new Map();Object.keys(st).forEach(k=>{const m=(st[k]||[])[0];if(k!==uid&&m&&m.id===k)RT.online.set(k,m);});if(!(S.route==='game'&&S.ctrl))softRender();if(S.ui.sheet&&S.ui.sheet.type==='opp')renderLayer();})
+      .subscribe(async st=>{if(st==='SUBSCRIBED')try{await RT.pres.track({id:uid,name:S.data.account.username,avatar:S.data.account.avatar,frame:S.data.account.frame,rating:S.data.rating});}catch(e){}});
+  }else RT.pres={off:true};
+  clearInterval(RT.poll);RT.poll=setInterval(()=>{if(document.visibilityState==='visible'&&NET.user)livePoll();},12000);livePoll();
+}
+function rtStop(){if(!rtOK())return;[RT.pres,RT.inbox].forEach(c=>{if(c&&!c.off)try{sb.removeChannel(c);}catch(e){}});RT.pres=RT.inbox=null;RT.online=new Map();clearInterval(RT.poll);}
+function rtSend(uid,payload){if(!rtOK()||!uid)return;const c=sb.channel('ryvo-u-'+uid);c.subscribe(st=>{if(st==='SUBSCRIBED'){c.send({type:'broadcast',event:'live',payload});setTimeout(()=>{try{sb.removeChannel(c);}catch(e){}},2000);}});}
+const isOnline=id=>RT.online.has(id);
+const pickSK=()=>{const Lb=S.ui.lobby,g=Lb.game&&Lb.game!=='cards'?Lb.game:'reflex';return g==='sprint'?'sprint@'+(Lb.track||0):g;};
+function oppSheetHTML(sh,closeBtn){
+  const sk=sh.sk,ids=[...RT.online.keys()],key='opp:'+ids.sort().join(','),onl=ids.length?cached(key,()=>rpc('find_players',{p_q:'',p_ids:ids}),15000):[];
+  const row=p=>{const best=p.bests&&p.bests[sk]!=null?Number(p.bests[sk]):null,on=isOnline(p.id);
+    return `<li>${avP({id:p.id,name:p.name,face:faceOf(p),frame:p.frame},36)}<span class="t"><b class="row" style="gap:6px;flex-wrap:nowrap"><span class="presence${on?' on':''}"></span>${esc(p.name)}</b>
+      <small>${p.rating} SR${p.school?' · '+esc(p.school):''} · ${best!=null?L('best','record')+' '+fmtScore(sk,best):L('no score on this game','pas de score sur ce jeu')}</small></span>
+      <span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" type="button" data-act="oppDuel" data-a="${p.id}" data-n="${esc(p.name)}" ${best==null?'disabled':''}>${L('Challenge','Défier')}</button>${on?`<button class="btn sm primary" type="button" data-act="oppLive" data-a="${p.id}" data-n="${esc(p.name)}">${L('Live','En direct')}</button>`:''}</span></li>`;};
+  const games=SKS.filter(k=>gameOf(k)!=='cards'&&GAME[gameOf(k)]&&GAME[gameOf(k)].playable);
+  return `<div class="modal-h"><div><h2>${L('Choose your opponent','Choisis ton adversaire')}</h2><p>${L('Challenge: you race their best score now, then they get yours to beat. Live: they accept and you play at the same time.','Défi : tu affrontes son record tout de suite, puis il reçoit ton score à battre. En direct : il accepte et vous jouez en même temps.')}</p></div>${closeBtn}</div>
+    <div class="row" style="align-items:flex-end"><div class="field" style="flex:1;min-width:150px"><label for="oppSk">${L('Game','Jeu')}</label><select class="input" id="oppSk" data-ch="oppSk">${games.map(k=>`<option value="${k}" ${k===sk?'selected':''}>${esc(skName(k))}</option>`).join('')}</select></div>
+      <div class="field" style="flex:1;min-width:150px"><label for="oppQ">${L('Find a player','Chercher un joueur')}</label><input class="input" id="oppQ" data-in="oppQ" value="${esc(sh.q||'')}" placeholder="${L('Username','Pseudo')}" autocomplete="off"></div></div>
+    ${sh.err?`<p class="err" style="color:var(--bad);font-size:13px;font-weight:600">${esc(sh.err)}</p>`:''}
+    ${sh.q&&sh.q.length>=2?`<h3 style="margin-top:6px">${L('Results','Résultats')}</h3>${sh.res===undefined?'<div class="skel"></div>':sh.res.length?`<ul class="hist">${sh.res.map(row).join('')}</ul>`:`<p class="tiny">${L('Nobody with that name.','Personne avec ce pseudo.')}</p>`}`:''}
+    <h3 style="margin-top:6px"><span class="presence on"></span> ${L('Online now','En ligne maintenant')} (${ids.length})</h3>
+    ${!showOnline()?`<p class="tiny">${L('You are hidden: turn “Show me online” back on in Social to see and invite players live.','Tu es masqué : réactive « Me montrer en ligne » dans Social pour voir et inviter des joueurs en direct.')}</p>`:!ids.length?`<p class="tiny">${L('Nobody else is online right now. You can still challenge anyone by name.','Personne d’autre n’est en ligne pour l’instant. Tu peux quand même défier n’importe qui par son pseudo.')}</p>`
+      :onl===undefined?'<div class="skel"></div>':`<ul class="hist">${(onl||[]).map(row).join('')}</ul>`}`;
+}
+function liveSheetHTML(sh,closeBtn){
+  const m=sh.m||{},opp=m.opp||{},name=esc(opp.name||''),gameN=esc(m.sk?skName(m.sk):''),av=opp.id?avP({id:opp.id,name:opp.name,face:faceOf(opp),frame:opp.frame},56):'';
+  const left=Math.max(0,Math.ceil(((m.created||Date.now())+45000-(Date.now()+(RT.off||0)))/1000));
+  const head=t=>`<div class="modal-h"><div><h2>${t}</h2><p>${gameN}</p></div>${sh.what==='go'?'':closeBtn}</div><div class="row" style="justify-content:center;padding:6px 0">${av}<b style="font-size:20px">${name}</b></div>`;
+  if(sh.what==='wait')return head(L('Invitation sent','Invitation envoyée'))+`<p class="tiny" style="text-align:center">${L(`Waiting for ${name} to accept…`,`En attente de la réponse de ${name}…`)} (<span data-left>${left}</span> s)</p><button class="btn" type="button" data-act="liveCancel">${L('Cancel','Annuler')}</button>`;
+  if(sh.what==='incoming')return head(L('Live duel!','Duel en direct !'))+`<p style="text-align:center">${L(`${name} invites you to a live duel. Same track, same draw, at the same time.`,`${name} t’invite à un duel en direct. Même circuit, même tirage, en même temps.`)} <span class="tiny">(<span data-left>${left}</span> s)</span></p><div class="row" style="justify-content:center"><button class="btn hot" type="button" data-act="liveAccept">${ic('play',16)}${L('Accept','Accepter')}</button><button class="btn" type="button" data-act="liveDecline">${L('Decline','Refuser')}</button></div>`;
+  if(sh.what==='go'){const t=Math.max(0,Math.ceil((sh.at-Date.now())/1000));return head(L('Get ready','Prépare-toi'))+`<p style="text-align:center;font:800 54px/1 var(--f-d)" data-go>${t||'GO'}</p><p class="tiny" style="text-align:center">${L('The race starts for both of you at the same moment.','La partie démarre pour vous deux au même moment.')}</p>`;}
+  return closeBtn;
+}
+function liveResultHTML(lv){
+  const name=esc(lv.opp&&lv.opp.name||''),sk=lv.sk;
+  if(lv.status!=='done')return `<div class="note" style="margin-top:10px">${ic('users')}<span>${lv.opp_done?L('Result coming…','Résultat en cours…'):L(`Live duel: waiting for ${name} to finish…`,`Duel en direct : en attente de l’arrivée de ${name}…`)}</span></div>`;
+  const t=lv.result==='win'?L(`You beat ${name}!`,`Tu bats ${name} !`):lv.result==='loss'?L(`${name} wins this one.`,`${name} remporte ce duel.`):L('Draw.','Égalité.');
+  return `<div class="note" style="margin-top:10px;border-color:${lv.result==='win'?'var(--good)':lv.result==='loss'?'var(--bad)':'var(--line)'}">${ic('users')}<span><b>${t}</b> ${L('You','Toi')} : ${lv.my_score!=null?fmtScore(sk,Number(lv.my_score)):'—'} · ${name} : ${lv.opp_score!=null?fmtScore(sk,Number(lv.opp_score)):L('did not finish','non terminé')}</span></div>`;
+}
+function liveSet(sh){S.ui.sheet=sh;renderLayer();clearInterval(RT.tick);RT.tick=setInterval(()=>{if(S.ui.sheet!==sh){clearInterval(RT.tick);return;}
+  /* compte à rebours mis à jour sur place (sans redessiner la fenêtre) */
+  const m=sh.m||{},left=Math.max(0,Math.ceil(((m.created||Date.now())+45000-(Date.now()+(RT.off||0)))/1000)),a=document.querySelector('#layer [data-left]'),g=document.querySelector('#layer [data-go]');
+  if(a)a.textContent=left;if(g){const t=Math.max(0,Math.ceil((sh.at-Date.now())/1000));g.textContent=t||'GO';}
+  if(sh.what==='incoming'&&left<=0){S.ui.sheet=null;renderLayer();}},250);}
+async function liveSignal(p){
+  if(!p.id||!NET.user)return;
+  let m;try{m=await rpc('live_get',{p_id:p.id});}catch(e){return;}if(!m)return;
+  if(m.status==='invited'&&m.role==='b'&&!RT.shown.has(m.id))liveIncoming(m);
+  if(RT.waiting&&RT.waiting===m.id)liveWaitCheck(m);
+  if((m.status==='cancelled'||m.status==='expired')&&S.ui.sheet&&S.ui.sheet.type==='live'&&S.ui.sheet.m&&S.ui.sheet.m.id===m.id){S.ui.sheet=null;renderLayer();toast(L('The invitation was cancelled.','L’invitation a été annulée.'));}
+}
+async function livePoll(){
+  try{const list=await rpc('live_pending');(list||[]).forEach(m=>{if(!RT.shown.has(m.id))liveIncoming(m);});}catch(e){}
+  if(NET.me&&NET.me.challenges_open&&!NET.chTold){NET.chTold=true;toast(L(`You have ${NET.me.challenges_open} challenge(s) to answer in Social.`,`Tu as ${NET.me.challenges_open} défi(s) à relever dans Social.`));}
+}
+function liveIncoming(m){
+  if(S.route==='game'&&S.ctrl)return;   // pas d'interruption en pleine partie : il reviendra au prochain contrôle
+  RT.shown.add(m.id);RT.off=(m.now||Date.now())-Date.now();SFX.play('coin');liveSet({type:'live',what:'incoming',m});
+}
+async function liveInvite(uid,sk){
+  try{const m=await rpc('live_invite',{p_to:uid,p_sk:sk});RT.waiting=m.id;RT.off=(m.now||Date.now())-Date.now();liveSet({type:'live',what:'wait',m});rtSend(uid,{kind:'invite',id:m.id});
+    const tick=async()=>{if(RT.waiting!==m.id)return;try{liveWaitCheck(await rpc('live_get',{p_id:m.id}));}catch(e){}if(RT.waiting===m.id)setTimeout(tick,2000);};setTimeout(tick,2000);}
+  catch(e){toast(errText(e));}
+}
+function liveWaitCheck(m){
+  if(!m||RT.waiting!==m.id)return;
+  if(m.status==='ready'){RT.waiting=null;liveGo(m);}
+  else if(m.status==='declined'){RT.waiting=null;S.ui.sheet=null;renderLayer();toast(L(`${m.opp.name} declined.`,`${m.opp.name} a refusé.`));}
+  else if(m.status==='expired'||m.status==='cancelled'){RT.waiting=null;S.ui.sheet=null;renderLayer();toast(L('No answer. Try again or send a challenge.','Pas de réponse. Réessaie ou envoie un défi.'));}
+}
+function liveGo(m){
+  RT.off=(m.now||Date.now())-Date.now();const at=(m.start||Date.now()+4000)-RT.off,g=gameOf(m.sk);
+  liveSet({type:'live',what:'go',m,at});
+  setTimeout(()=>{S.ui.sheet=null;renderLayer();startGame(g,'trial',null,{live:m.id,track:trackOf(m.sk)});},Math.max(0,at-Date.now()-2100));
+}
+/* canal de la partie : positions (course) et arrivée, envoyés directement entre les deux joueurs */
+function liveJoin(id,opp){
+  const L0={id,opp,ctx:{pos:null,send:null},oppDone:null};
+  if(rtOK()){const ch=sb.channel('ryvo-m-'+id,{config:{broadcast:{self:false}}});L0.ch=ch;
+    ch.on('broadcast',{event:'pos'},({payload})=>{L0.ctx.pos=payload;})
+      .on('broadcast',{event:'fin'},({payload})=>{L0.oppDone=payload;const b=document.getElementById('liveBar');if(b)b.textContent=L(`${opp.name} finished: ${fmtScore(S.game.sk,Number(payload.score))}`,`${opp.name} a fini : ${fmtScore(S.game.sk,Number(payload.score))}`);if(S.route==='result'&&S.result&&S.result.live)livePollResult(id,true);})
+      .subscribe(st=>{if(st==='SUBSCRIBED')L0.ctx.send=p=>ch.send({type:'broadcast',event:'pos',payload:p});});}
+  L0.fin=score=>{if(L0.ch)L0.ch.send({type:'broadcast',event:'fin',payload:{score}});setTimeout(()=>{try{sb.removeChannel(L0.ch);}catch(e){}},15000);};
+  return L0;
+}
+function livePollResult(id,once){
+  clearTimeout(RT.res);const t0=Date.now();
+  const go=async()=>{try{const lv=await rpc('live_get',{p_id:id});if(S.result&&S.result.live&&S.result.live.id===id){S.result.live=lv;if(S.route==='result')softRender();}if(lv.status==='done'){if(lv.result==='win')SFX.play('win');return;}}catch(e){}
+    if(!once&&Date.now()-t0<6*60000)RT.res=setTimeout(go,2500);};
+  go();
+}
+function challengesHTML(){
+  const v=cached('ch',()=>rpc('my_challenges'),15000);
+  if(v===undefined)return {rec:'<div class="skel"></div>',hist:'<div class="skel"></div>'};if(!v)return {rec:'',hist:''};
+  const who=c=>avP({id:c.opp.id,name:c.opp.name,face:faceOf(c.opp),frame:c.opp.frame},32);
+  const rec=v.received.length?`<ul class="hist">${v.received.map(c=>`<li>${who(c)}<span class="t"><b>${esc(c.opp.name)}</b><small>${esc(skName(c.sk))} · ${L('score to beat','score à battre')} <b>${fmtScore(c.sk,Number(c.from_score))}</b> · ${endsTxt(c.expires)}</small></span>
+      <span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm hot" type="button" data-act="chPlay" data-a="${c.id}" data-sk="${c.sk}">${L('Take it on','Relever')}</button><button class="btn sm ghost" type="button" data-act="chDecline" data-a="${c.id}" aria-label="${L('Decline','Refuser')}">✕</button></span></li>`).join('')}</ul>`
+    :`<div class="empty"><b>${L('No challenge waiting','Aucun défi en attente')}</b>${L('Challenge a friend: they’ll get your score to beat.','Défie un ami : il recevra ton score à battre.')}</div>`;
+  const RES={win:[L('Won','Gagné'),'now'],loss:[L('Lost','Perdu'),''],draw:[L('Draw','Égalité'),'']};
+  const hist=v.history.length?`<ul class="hist">${v.history.map(c=>{const r=c.status==='done'?RES[c.result]:c.status==='open'?[L('Waiting','En attente'),'warn']:c.status==='playing'?[L('Playing','En cours'),'warn']:c.status==='declined'?[L('Declined','Refusé'),'']:[L('Expired','Expiré'),''];
+      return `<li>${who(c)}<span class="t"><b>${c.mine?L('You challenged','Tu as défié'):L('Challenged by','Défié par')} ${esc(c.opp.name)}</b><small>${esc(skName(c.sk))} · ${fmtScore(c.sk,Number(c.mine?c.from_score:c.to_score))} ${L('vs','contre')} ${c.mine?(c.to_score!=null?fmtScore(c.sk,Number(c.to_score)):'—'):fmtScore(c.sk,Number(c.from_score))}</small></span><span class="pill ${r[1]}">${r[0]}</span></li>`;}).join('')}</ul>`
+    :`<p class="tiny">${L('Your challenges will appear here.','Tes défis apparaîtront ici.')}</p>`;
+  return {rec,hist};
+}
+if(LIVE){
+  const A2=Object.assign({},ACT);
+  Object.assign(ACT,{
+    gear:(k,v)=>{A2.gear(k,v);if(NET.user)rpc('update_profile',{p:{gear:{[k]:v||null}}}).then(m=>{applyMe(m);softRender();}).catch(e=>{toast(errText(e));loadMe();});},
+    oppPick:()=>{if(!NET.user){ACT.auth('login');return;}S.ui.sheet={type:'opp',sk:pickSK(),q:''};renderLayer();},
+    oppDuel:(a,el)=>{const sh=S.ui.sheet,sk=sh&&sh.sk||pickSK();S.ui.sheet=null;renderLayer();startGame(gameOf(sk),'duel',null,{opp:a,track:trackOf(sk)});},
+    oppLive:(a,el)=>{const sk=S.ui.sheet&&S.ui.sheet.sk||pickSK();liveInvite(a,sk);},
+    liveCancel:()=>{const m=S.ui.sheet&&S.ui.sheet.m;RT.waiting=null;S.ui.sheet=null;renderLayer();if(m){rpc('live_cancel',{p_id:m.id}).catch(()=>{});rtSend(m.opp&&m.opp.id,{kind:'cancel',id:m.id});}},
+    liveAccept:async()=>{const m=S.ui.sheet&&S.ui.sheet.m;if(!m)return;try{const r=await rpc('live_answer',{p_id:m.id,p_accept:true});rtSend(m.opp.id,{kind:'answer',id:m.id});liveGo(r);}catch(e){S.ui.sheet=null;renderLayer();toast(errText(e));}},
+    liveDecline:()=>{const m=S.ui.sheet&&S.ui.sheet.m;S.ui.sheet=null;renderLayer();if(m){rpc('live_answer',{p_id:m.id,p_accept:false}).then(()=>rtSend(m.opp.id,{kind:'answer',id:m.id})).catch(()=>{});}},
+    chPlay:(a,el)=>{const sk=el.dataset.sk;invalidate('ch');startGame(gameOf(sk),'duel',null,{challenge:a,track:trackOf(sk)});},
+    chDecline:a=>{rpc('decline_challenge',{p_id:a}).then(()=>{invalidate('ch');loadMe();render();}).catch(e=>toast(errText(e)));},
+    onlineToggle:()=>{const on=!showOnline();try{localStorage.setItem('ryvo.hidden',on?'0':'1');}catch(e){}rtStop();rtStart();render();},
+    quit:()=>{if(S.game&&S.game.live&&S.route==='game'){S.ui.sheet={type:'confirm',what:'quit'};renderLayer();return;}A2.quit();},
+    confirmYes:async()=>{const sh=S.ui.sheet;if(sh&&sh.what==='quit'&&S.game&&S.game.live){rpc('live_cancel',{p_id:S.game.live.id}).catch(()=>{});}return ACT._confirmYes0();}
+  });
+  ACT._confirmYes0=A2.confirmYes;
+  document.addEventListener('input',e=>{if(!(e.target&&e.target.dataset&&e.target.dataset.in==='oppQ'))return;const sh=S.ui.sheet;if(!sh||sh.type!=='opp')return;
+    sh.q=e.target.value.trim();sh.res=undefined;clearTimeout(RT.qt);if(sh.q.length<2){renderLayer();return;}
+    RT.qt=setTimeout(async()=>{const q=sh.q;try{const r=await rpc('find_players',{p_q:q,p_ids:null});if(S.ui.sheet===sh&&sh.q===q){sh.res=r||[];renderLayer();}}catch(err){sh.err=errText(err);renderLayer();}},300);});
+  document.addEventListener('change',e=>{if(!(e.target&&e.target.dataset&&e.target.dataset.ch==='oppSk'))return;const sh=S.ui.sheet;if(sh&&sh.type==='opp'){sh.sk=e.target.value;renderLayer();}});
+  VIEWS.social=()=>{
+    const st=S.data,duels=st.history.filter(h=>h.m==='duel').slice(0,8),ch=NET.user?challengesHTML():{rec:'',hist:''};
+    const online=[...RT.online.values()];
+    const head=`<div class="page-h"><div><p class="eyebrow">Social</p><h1>${L('Pick your opponent','Choisis ton adversaire')}</h1><p>${L('Challenge anyone by name, or play live against someone online right now.','Défie n’importe qui par son pseudo, ou joue en direct contre quelqu’un de connecté.')}</p></div>
+      <button class="btn primary" type="button" data-act="oppPick">${ic('swords',16)}${L('Choose an opponent','Choisir un adversaire')}</button></div>`;
+    if(!NET.user)return head+`<div class="empty"><b>${L('Sign in to challenge players','Connecte-toi pour défier des joueurs')}</b><button class="btn sm primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button></div>`;
+    return head+`<div class="grid">
+      <section class="card pop c6"><div class="card-h"><h2>${L('Challenges to answer','Défis à relever')}</h2></div>${ch.rec}</section>
+      <section class="card c6"><div class="card-h"><h2><span class="presence on"></span> ${L('Online now','En ligne maintenant')}</h2><label class="tiny" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-act="onlineToggle" ${showOnline()?'checked':''}>${L('Show me online','Me montrer en ligne')}</label></div>
+        ${!rtOK()?`<p class="tiny">${L('Live presence is unavailable right now.','La présence en direct est indisponible pour le moment.')}</p>`:online.length?`<ul class="hist">${online.slice(0,12).map(p=>`<li>${avP({id:p.id,name:p.name,face:faceOf(p),frame:p.frame},32)}<span class="t"><b>${esc(p.name)}</b><small>${p.rating||'—'} SR</small></span><button class="btn sm primary" type="button" data-act="oppPick">${L('Play','Jouer')}</button></li>`).join('')}</ul>`
+          :`<p class="tiny">${L('Nobody else online right now. Send a challenge: they’ll answer when they come back.','Personne d’autre en ligne pour l’instant. Envoie un défi : il répondra en revenant.')}</p>`}</section>
+      <section class="card c6"><div class="card-h"><h2>${L('Challenge history','Historique des défis')}</h2></div>${ch.hist}</section>
+      <section class="card c6"><div class="card-h"><h2>${L('Your duels','Tes duels')}</h2></div>${duels.length?`<ul class="hist">${duels.map(histItem).join('')}</ul>`:`<div class="empty"><b>${L('No duels yet','Aucun duel')}</b></div>`}</section>
+      <section class="card c12"><div class="card-h"><h2>${L('Recent duels','Duels récents')}</h2></div>${liveFeedHTML()}<p class="tiny">${L('To report a player, use the ⚑ next to their name in the rankings.','Pour signaler un joueur, utilise le ⚑ à côté de son pseudo dans les classements.')}</p></section>
+    </div>`;
+  };
+}
+
 /* ---------- démarrage ---------- */
 if(LIVE){
   const css=document.createElement('style');css.textContent='.rep{border:0;background:none;color:var(--mute);cursor:pointer;font-size:12px;padding:0 4px;margin-left:4px;border-radius:6px}.rep:hover{color:var(--bad);background:var(--bad-soft)}';document.head.appendChild(css);
   sb.auth.onAuthStateChange((ev,session)=>{
     const u=session?session.user:null,changed=(u&&u.id)!==(NET.user&&NET.user.id);NET.user=u;
     if(ev==='PASSWORD_RECOVERY'){S.ui.sheet={type:'auth',tab:'newpw'};renderLayer();}
-    if(changed){invalidate();if(u){loadMe();}else{toGuest();softRender();}loadInfo();}
+    if(changed){invalidate();if(u){loadMe();setTimeout(rtStart,500);}else{rtStop();toGuest();softRender();}loadInfo();}
   });
   /* liens entrants : retour de paiement Stripe, invitation à une ligue */
   const qs=new URLSearchParams(location.search),buy=qs.get('achat'),inv=qs.get('ligue');
@@ -557,7 +715,7 @@ if(LIVE){
   if(buy==='ok'){setTimeout(()=>toast(L('Payment received. Your gems arrive in a few seconds.','Paiement reçu. Tes gemmes arrivent dans quelques secondes.')),600);[3000,7000,15000].forEach(t=>setTimeout(loadMe,t));go('shop');}
   if(buy==='annule')setTimeout(()=>toast(L('Payment cancelled. Nothing was charged.','Paiement annulé. Rien n’a été débité.')),600);
   if(inv&&/^[A-Za-z0-9]{6}$/.test(inv)){NET.pendingLeague=inv.toUpperCase();setTimeout(()=>openLeagueInvite(NET.pendingLeague),700);}
-  sb.auth.getSession().then(({data})=>{const u=data&&data.session?data.session.user:null;if(u&&!NET.user){NET.user=u;loadMe();}if(!u&&S.data.uid)toGuest();loadInfo();});
+  sb.auth.getSession().then(({data})=>{const u=data&&data.session?data.session.user:null;if(u&&!NET.user){NET.user=u;loadMe();setTimeout(rtStart,500);}if(!u&&S.data.uid)toGuest();loadInfo();});
 }
 rollDaily();
 render();

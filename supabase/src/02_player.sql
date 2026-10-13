@@ -103,6 +103,7 @@ begin
     'school_id', v_p.school_id, 'program', v_p.program, 'study_year', v_p.study_year,
     'school_lock_until', case when v_p.school_set_at between now() - interval '30 days' and now() - interval '24 hours' then ms(v_p.school_set_at + interval '30 days') end, 'xp', v_p.xp, 'level', level_of(v_p.xp), 'rating', v_p.rating, 'streak', v_p.streak,
     'status', v_p.status, 'until', ms(v_p.suspended_until), 'verified', v_p.verified, 'plus', v_p.plus,
+    'gear', v_p.gear, 'challenges_open', (select count(*) from challenges where to_user = v_uid and status = 'open' and expires_at > now()),
     'gems', v_p.gems, 'owned', (select coalesce(jsonb_agg(item_id), '[]') from owned_items where user_id = v_uid),
     'ads_today', (select count(*) from gem_ledger where user_id = v_uid and reason = 'ad' and at >= day_start()),
     'ad_last', (select ms(max(at)) from gem_ledger where user_id = v_uid and reason = 'ad'),
@@ -162,6 +163,15 @@ begin
       update verifications set status = 'rejected', decided_at = now() where user_id = v_uid and status = 'pending';
     end if;
   end if;
+  if p ? 'gear' then
+    -- p.gear = {"car_paint": "flames"} pour équiper, {"car_paint": null} pour retirer ; seulement les objets possédés
+    for v_u in select jsonb_object_keys(p->'gear') loop
+      if v_u not in ('car_model','car_paint','car_trail','stack','aim') then raise exception 'locked_item'; end if;
+      if p->'gear'->>v_u is null then update profiles set gear = gear - v_u where id = v_uid;
+      elsif owns(v_uid, v_u, p->'gear'->>v_u) then update profiles set gear = gear || jsonb_build_object(v_u, p->'gear'->>v_u) where id = v_uid;
+      else raise exception 'locked_item'; end if;
+    end loop;
+  end if;
   if p ? 'study_year' then
     if p->>'study_year' is not null and p->>'study_year' not in ('1','2','3','4','5','6') then raise exception 'bad_year'; end if;
     update profiles set study_year = p->>'study_year' where id = v_uid;
@@ -216,9 +226,13 @@ begin
 end $$;
 
 -- ---------- lancer une partie ----------
-create or replace function public.start_run(p_game text, p_mode text default 'trial', p_track int default 0, p_cat text default 'mix', p_lang text default 'fr') returns jsonb
+drop function if exists public.start_run(text,text,int,text,text);
+-- p_opp : défi direct contre ce joueur ; p_challenge : relever un défi reçu ; p_live : duel en direct accepté
+create or replace function public.start_run(p_game text, p_mode text default 'trial', p_track int default 0, p_cat text default 'mix', p_lang text default 'fr',
+  p_opp uuid default null, p_challenge uuid default null, p_live uuid default null) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
+  v_ch challenges; v_lm live_matches; v_fixseed bigint; v_tgt profiles; v_other uuid;
   v_uid uuid := auth.uid(); v_p profiles; v_g games; v_sk text; v_seed bigint; v_tr jsonb := setting('tracks'); v_lv int;
   v_id uuid; v_sec jsonb := '{}'; v_out jsonb; v_d record; v_opp record; v_oppj jsonb; v_base numeric; v_os numeric; v_skill numeric;
   v_rec record; v_perm int[]; v_opts jsonb; v_ci int; v_pub jsonb := '[]'; v_secq jsonb := '[]'; v_i int; v_len int; v_w record; v_used text[] := '{}'; v_scr text;
@@ -231,6 +245,27 @@ begin
   if p_mode = 'school' and v_p.school_id is null then raise exception 'no_school'; end if;
   if (select count(*) from runs where user_id = v_uid and started_at > now() - interval '1 hour') >= 80 then raise exception 'rate_limited'; end if;
   v_lv := level_of(v_p.xp);
+  if (p_opp is not null or p_challenge is not null or p_live is not null) and p_game = 'cards' then raise exception 'bad_board'; end if;
+  -- défi reçu : même circuit, même tirage (mêmes questions, mêmes mots) que celui qui t'a défié
+  if p_challenge is not null then
+    select * into v_ch from challenges where id = p_challenge and to_user = v_uid for update;
+    if v_ch.id is null or v_ch.status <> 'open' then raise exception 'challenge_closed'; end if;
+    if v_ch.expires_at < now() then update challenges set status = 'expired' where id = v_ch.id; raise exception 'challenge_closed'; end if;
+    if split_part(v_ch.sk, '@', 1) <> p_game then raise exception 'bad_board'; end if;
+    p_mode := 'duel'; p_track := coalesce(nullif(split_part(v_ch.sk, '@', 2), '')::int, 0); p_cat := v_ch.cat; v_fixseed := v_ch.seed;
+  elsif p_live is not null then
+    select * into v_lm from live_matches where id = p_live and v_uid in (a, b) for update;
+    if v_lm.id is null or v_lm.status <> 'ready' or (case when v_lm.a = v_uid then v_lm.a_run else v_lm.b_run end) is not null then raise exception 'live_closed'; end if;
+    if split_part(v_lm.sk, '@', 1) <> p_game then raise exception 'bad_board'; end if;
+    p_mode := 'trial'; p_track := coalesce(nullif(split_part(v_lm.sk, '@', 2), '')::int, 0); p_cat := 'mix'; v_fixseed := v_lm.seed;
+    v_other := case when v_lm.a = v_uid then v_lm.b else v_lm.a end;
+  elsif p_opp is not null then
+    if p_opp = v_uid then raise exception 'bad_target'; end if;
+    select * into v_tgt from profiles where id = p_opp and status = 'active';
+    if v_tgt.id is null then raise exception 'bad_target'; end if;
+    if (select count(*) from challenges where from_user = v_uid and created_at > now() - interval '1 day') >= 30 then raise exception 'rate_limited'; end if;
+    p_mode := 'duel';
+  end if;
   update runs set status = 'void', flag_detail = 'Partie abandonnée' where user_id = v_uid and status = 'open' and started_at < now() - interval '30 minutes';
   if p_mode = 'daily' then
     select * into v_d from daily_today();
@@ -240,18 +275,34 @@ begin
     p_track := v_d.track; p_cat := 'mix';
     v_seed := abs(hashtext(today_fr()::text || p_game));
   else
-    v_seed := floor(random() * 2147483646)::bigint + 1;
+    v_seed := coalesce(v_fixseed, floor(random() * 2147483646)::bigint + 1);
   end if;
   if p_game = 'sprint' then
     p_track := greatest(0, least(2, coalesce(p_track, 0)));
-    if p_mode <> 'daily' and (v_tr->p_track->>'lv')::int > v_lv then p_track := 0; end if;
+    if p_mode <> 'daily' and v_fixseed is null and (v_tr->p_track->>'lv')::int > v_lv then p_track := 0; end if;
     v_sk := 'sprint@' || p_track;
   else v_sk := p_game; end if;
   if p_lang not in ('fr','en') then p_lang := 'fr'; end if;
 
   -- adversaire de duel : un vrai joueur proche en cote, sinon le bot RYVO
-  if p_mode = 'duel' then
-    select p.id, p.username, p.rating, p.avatar, p.frame, s.short, b.best into v_opp
+  if p_mode = 'duel' and (p_challenge is not null or p_opp is not null) then
+    -- adversaire choisi : son vrai record (défi direct) ou le score de son défi (défi reçu)
+    select p.id, p.username, p.rating, p.avatar, p.frame, p.gear, s.short,
+      case when p_challenge is not null then v_ch.from_score
+           else (select case when game_lower(p_game) then min(r.score) else max(r.score) end from runs r where r.user_id = p.id and r.sk = v_sk and r.status = 'valid') end best
+    into v_opp from profiles p left join schools s on s.id = p.school_id
+    where p.id = coalesce(v_ch.from_user, p_opp);
+    if v_opp.best is null then raise exception 'opp_no_score'; end if;
+    v_oppj := jsonb_build_object('id', v_opp.id, 'name', v_opp.username, 'rating', v_opp.rating, 'avatar', v_opp.avatar, 'frame', v_opp.frame, 'gear', v_opp.gear,
+      'school', v_opp.short, 'score', v_opp.best, 'skill', round(greatest(0, least(1, (v_opp.rating - 860) / 800.0)), 2), 'bot', false, 'chosen', true);
+    v_sec := v_sec || jsonb_build_object('opp', jsonb_build_object('id', v_opp.id, 'rating', v_opp.rating, 'score', v_opp.best, 'name', v_opp.username,
+      'challenge', p_challenge, 'target', case when p_challenge is null then p_opp end));
+  elsif p_live is not null then
+    select p.id, p.username, p.rating, p.avatar, p.frame, p.gear, s.short into v_opp from profiles p left join schools s on s.id = p.school_id where p.id = v_other;
+    v_oppj := jsonb_build_object('id', v_opp.id, 'name', v_opp.username, 'rating', v_opp.rating, 'avatar', v_opp.avatar, 'frame', v_opp.frame, 'gear', v_opp.gear, 'school', v_opp.short, 'live', true);
+    v_sec := v_sec || jsonb_build_object('live', p_live);
+  elsif p_mode = 'duel' then
+    select p.id, p.username, p.rating, p.avatar, p.frame, p.gear, s.short, b.best into v_opp
     from profiles p left join schools s on s.id = p.school_id
     join lateral (select case when game_lower(p_game) then min(r.score) else max(r.score) end best from runs r where r.user_id = p.id and r.sk = v_sk and r.status = 'valid') b on b.best is not null
     where p.id <> v_uid and p.status = 'active' and abs(p.rating - v_p.rating) < 300
@@ -262,7 +313,7 @@ begin
     v_skill := greatest(0, least(1, (coalesce(v_opp.rating, v_p.rating) - 860) / 800.0));
     if p_game = 'cards' then v_os := null; end if;
     v_oppj := jsonb_build_object('id', v_opp.id, 'name', coalesce(v_opp.username, 'RYVO Bot'), 'rating', coalesce(v_opp.rating, v_p.rating), 'avatar', coalesce(v_opp.avatar, 6),
-      'frame', coalesce(v_opp.frame, 'basic'), 'school', v_opp.short, 'score', v_os, 'skill', round(v_skill, 2), 'bot', v_opp.id is null);
+      'frame', coalesce(v_opp.frame, 'basic'), 'gear', coalesce(v_opp.gear, '{}'::jsonb), 'school', v_opp.short, 'score', v_os, 'skill', round(v_skill, 2), 'bot', v_opp.id is null);
     v_sec := v_sec || jsonb_build_object('opp', jsonb_build_object('id', v_opp.id, 'rating', coalesce(v_opp.rating, v_p.rating), 'score', v_os, 'name', coalesce(v_opp.username, 'RYVO Bot')));
   end if;
 
@@ -299,7 +350,9 @@ begin
   insert into runs(user_id, game, sk, mode, seed, secret, opp_name, extra)
   values (v_uid, p_game, v_sk, p_mode, v_seed, v_sec, v_oppj->>'name', jsonb_build_object('lang', p_lang, 'track', p_track, 'cat', p_cat))
   returning id into v_id;
-  v_out := jsonb_build_object('run', v_id, 'seed', v_seed, 'sk', v_sk, 'track', p_track, 'mode', p_mode, 'cat', p_cat, 'opp', v_oppj);
+  if p_challenge is not null then update challenges set status = 'playing', to_run = v_id, played_at = now() where id = p_challenge; end if;
+  if p_live is not null then update live_matches set a_run = case when a = v_uid then v_id else a_run end, b_run = case when b = v_uid then v_id else b_run end, updated_at = now() where id = p_live; end if;
+  v_out := jsonb_build_object('run', v_id, 'seed', v_seed, 'sk', v_sk, 'track', p_track, 'mode', p_mode, 'cat', p_cat, 'opp', v_oppj, 'live', p_live, 'challenge', p_challenge);
   if p_game = 'brain' then v_out := v_out || jsonb_build_object('questions', v_pub); end if;
   if p_game = 'words' then v_out := v_out || jsonb_build_object('words', v_pub); end if;
   return v_out;
@@ -364,7 +417,7 @@ declare
   v_yw int; v_aw int; v_mg int; v_am int; v_fl int; v_pf int; v_bd int; v_hits int; v_shots int;
   v_lower boolean; v_stat record; v_z numeric; v_status text; v_prevbest numeric; v_xp int := 0; v_dr int := 0; v_exp numeric; v_s numeric;
   v_school int := 0; v_w int := 0; v_today date := today_fr(); v_newstreak int; v_m text; v_defs jsonb := mission_defs(); v_award jsonb := '[]'; v_mx int := 0;
-  v_rw record; v_rs record;
+  v_rw record; v_rs record; v_chid uuid; v_live jsonb;
 begin
   if v_uid is null then raise exception 'not_authenticated'; end if;
   select * into v_r from runs where id = p_run and user_id = v_uid for update;
@@ -469,6 +522,7 @@ begin
 
   if v_bad is not null or v_score is null then
     update runs set status = 'void', submitted_at = now(), flag_detail = 'Rejetée : données incohérentes (' || coalesce(v_bad,'score') || ')' where id = p_run;
+    perform run_closed_hooks(v_r, null, 'void', null);
     return jsonb_build_object('rejected', true);
   end if;
 
@@ -529,12 +583,14 @@ begin
     end if;
   end loop;
 
+  select r.chid, r.live into v_chid, v_live from run_closed_hooks(v_r, v_score, v_status, v_out) r;
   select * into v_p from profiles where id = v_uid;
   select (l->'me'->>'pos')::int pos, (l->>'total')::int total into v_rw from (select leaderboard(v_r.sk, 'world', 1) l) z;
   select (l->'me'->>'pos')::int pos, (l->>'total')::int total into v_rs from (select leaderboard(v_r.sk, 'school', 1) l) z;
   return jsonb_build_object('score', v_score, 'status', v_status, 'outcome', v_out, 'opp_score', v_os, 'prev', v_prevbest, 'xp', v_xp, 'mission_xp', v_mx, 'missions', v_award,
     'dr', v_dr, 'rating', v_p.rating, 'xp_total', v_p.xp, 'level', level_of(v_p.xp), 'streak', v_p.streak, 'school_gain', v_school,
-    'rank_world', v_rw.pos, 'total_world', v_rw.total, 'rank_school', v_rs.pos, 'total_school', v_rs.total, 'details', v_det);
+    'rank_world', v_rw.pos, 'total_world', v_rw.total, 'rank_school', v_rs.pos, 'total_school', v_rs.total, 'details', v_det,
+    'challenge_sent', v_chid, 'live', v_live);
 end $$;
 
 -- ---------- classements ----------

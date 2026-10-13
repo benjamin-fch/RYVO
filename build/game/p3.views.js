@@ -252,7 +252,7 @@ VIEWS.lobby=()=>{
 
 VIEWS.game=()=>{
   const g=GAME[S.game.id],o=S.game.oppId?DEMO_BY[S.game.oppId]:(S.game.run&&S.game.run.opp?{name:S.game.run.opp.name}:null);
-  return `<div class="gframe" style="--g:${g.col}"><div class="gframe-h"><button class="btn sm" type="button" data-act="quit">${ic('x',16)}${L('Quit','Quitter')}</button><h1>${g.name}</h1><span class="pill ink">${MODES[S.game.mode].n()}</span>${S.game.practice?`<span class="pill warn">${L('Guest · not saved','Invité · non enregistré')}</span>`:''}${g.id==='sprint'?`<span class="pill">${TRACKS[trackOf(S.game.sk)].name}</span>`:''}${o?`<span class="pill sim">${L('vs','contre')} ${esc(o.name)} · ${L('simulated','simulé')}</span>`:''}<div class="grow"></div></div>
+  return `<div class="gframe" style="--g:${g.col}"><div class="gframe-h"><button class="btn sm" type="button" data-act="quit">${ic('x',16)}${L('Quit','Quitter')}</button><h1>${g.name}</h1><span class="pill ink">${MODES[S.game.mode].n()}</span>${S.game.practice?`<span class="pill warn">${L('Guest · not saved','Invité · non enregistré')}</span>`:''}${S.game.live?`<span class="pill now" id="liveBar">${L('Live vs','En direct contre')} ${esc(S.game.live.opp&&S.game.live.opp.name||'')}</span>`:''}${g.id==='sprint'?`<span class="pill">${TRACKS[trackOf(S.game.sk)].name}</span>`:''}${o&&!S.game.live?(LIVE?`<span class="pill">${L('vs','contre')} ${esc(o.name)}</span>`:`<span class="pill sim">${L('vs','contre')} ${esc(o.name)} · ${L('simulated','simulé')}</span>`):''}<div class="grow"></div></div>
   <div class="stage" id="gameMount"></div></div>`;
 };
 
@@ -283,7 +283,7 @@ VIEWS.result=()=>{
     <p class="eyebrow">${esc(skName(sk))} · ${MODES[r.mode].n()}</p>
     <div class="big" id="resScore" data-to="${r.score}">${fmtScore(sk,r.score)}</div>
     ${r.server&&r.server.status==='flagged'?`<span class="pill warn" style="background:#fff">${L('Under review: this score joins the rankings once checked','En vérification : ce score rejoindra le classement après contrôle')}</span>`:''}
-    ${r.oppName?`<p class="mu">${esc(r.oppName)}${r.oppName!=='PB'?` (${L('simulated','simulé')})`:''} : <b>${r.oppScore!=null?fmtScore(sk,r.oppScore):'—'}</b></p>`:''}
+    ${r.oppName?`<p class="mu">${esc(r.oppName)}${r.oppName!=='PB'&&!LIVE?` (${L('simulated','simulé')})`:''} : <b>${r.oppScore!=null?fmtScore(sk,r.oppScore):'—'}</b></p>`:''}
     <div class="res-actions">
       <button class="btn hot" type="button" data-act="again">${ic('refresh',16)}${r.mode==='duel'?L('Rematch','Revanche'):L('Play again','Rejouer')}</button>
       <button class="btn" type="button" data-act="share">${ic('share',16)}${L('Share','Partager')}</button>
@@ -481,21 +481,28 @@ function adState(){
 }
 const payReady=()=>!LIVE||!!(CFG.payments&&CFG.seller);
 function itemPreview(it,size=56){
+  const gr=S.data.gear||{},img=u=>u?`<img src="${u}" width="120" height="64" alt="" style="max-width:100%;height:auto">`:'';
+  if(it.kind==='car_model')return img(carPrevURL(it.ref,gr.car_paint,null));
+  if(it.kind==='car_paint')return img(carPrevURL(gr.car_model,it.ref,null));
+  if(it.kind==='car_trail')return img(carPrevURL(gr.car_model,gr.car_paint,it.ref));
+  if(it.kind==='stack')return img(stackPrevURL(it.ref));
+  if(it.kind==='aim')return img(aimPrevURL(it.ref));
   if(it.kind==='avatar')return `<span class="avw">${face(AV_PRESETS[+it.ref]||AV_PRESETS[0],size)}</span>`;
   if(it.kind==='frame')return avP(me(),size-8,it.ref);
   const k=SKINS.find(x=>x.id===it.ref)||{c:'#ccc'};return `<span class="sw" style="background:${k.c}"><i></i><i style="background:var(--sun);flex:.6"></i></span>`;
 }
-const isEquipped=it=>{const a=S.data.account;return it.kind==='avatar'?a.avatar===+it.ref:it.kind==='frame'?a.frame===it.ref:a.skin===it.ref;};
+const isEquipped=it=>{const a=S.data.account;if(GEAR_KINDS.includes(it.kind))return (S.data.gear||{})[it.kind]===it.ref;return it.kind==='avatar'?a.avatar===+it.ref:it.kind==='frame'?a.frame===it.ref:a.skin===it.ref;};
 VIEWS.shop=()=>{
   const st=S.data,C=shopCfg(),signed=!LIVE||!!NET.user,tab=S.ui.shop.tab,ad=adState();
   const rate=C.packs.length?Math.min(...C.packs.map(p=>p.cents/p.gems)):0,base=C.packs.length?Math.max(...C.packs.map(p=>p.cents/p.gems)):0;
   const packs=C.packs.map((p,i)=>{const bonus=base?Math.round((base/(p.cents/p.gems)-1)*100):0;
     return `<div class="pack">${bonus>=5?`<span class="sticker${i===C.packs.length-1?' pink':''} bonus">+${bonus} %</span>`:''}<span class="g">${ic('gem',24)}${fmt(p.gems)}</span><span class="tiny">${L('gems','gemmes')}</span>
       <button class="btn ${i===1?'hot':'primary'}" type="button" data-act="packBuy" data-a="${p.id}" ${payReady()?'':'disabled'}>${eur(p.cents)}</button></div>`;}).join('');
-  const items=C.items.filter(i=>i.kind===tab);
-  const card=it=>{const own=ownsItem(it.kind,it.ref),eq=own&&isEquipped(it);
+  const GROUPS={car:[['car_model',L('Car models','Modèles de voiture'),L('Same speed for every model: purely visual.','Même vitesse pour tous les modèles : purement visuel.')],['car_paint',L('Paints','Peintures'),''],['car_trail',L('Trails','Traînées'),'']],
+    stack:[['stack','Skyline Stack',L('Your tower’s blocks.','Les blocs de ta tour.')]],aim:[['aim','Pop Shot',L('Gold targets stay gold so the rules don’t change.','Les cibles dorées restent dorées pour que les règles ne changent pas.')]]};
+  const card=it=>{const own=ownsItem(it.kind,it.ref),eq=own&&isEquipped(it),gear=GEAR_KINDS.includes(it.kind);
     return `<div class="sitem${own?' own':''}"><span class="prev">${itemPreview(it)}</span><b>${esc(L(it.en,it.fr))}</b>
-      ${own?(eq?`<span class="pill now">${ic('check',13)}${L('Equipped','Équipé')}</span>`:`<button class="btn sm" type="button" data-act="equip" data-a="${it.id}">${L('Equip','Équiper')}</button>`)
+      ${own?(eq?(gear?`<button class="btn sm ghost" type="button" data-act="unequip" data-a="${it.id}">${ic('check',13)}${L('Equipped · remove','Équipé · retirer')}</button>`:`<span class="pill now">${ic('check',13)}${L('Equipped','Équipé')}</span>`):`<button class="btn sm" type="button" data-act="equip" data-a="${it.id}">${L('Equip','Équiper')}</button>`)
         :`<button class="btn sm primary" type="button" data-act="itemBuy" data-a="${it.id}">${ic('gem',14)}${fmt(it.price)}</button>`}</div>`;};
   return `<div class="page-h"><div><p class="eyebrow">${L('Shop','Boutique')}</p><h1>${L('Stand out. Never pay to win.','Démarque-toi. Sans jamais payer pour gagner.')}</h1>
     <p>${L('Avatars, frames and themes that everyone sees in the rankings. Nothing here changes a score, a timer or a rating.','Des avatars, cadres et thèmes que tout le monde voit dans les classements. Rien ici ne change un score, un chrono ou une cote.')}</p></div>
@@ -503,8 +510,8 @@ VIEWS.shop=()=>{
   ${LIVE&&!NET.user?`<div class="note" style="margin-bottom:16px">${ic('info')}<span>${L('Sign in to buy and keep your items on every device.','Connecte-toi pour acheter et retrouver tes objets sur tous tes appareils.')}</span><button class="btn sm primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button></div>`:''}
   <div class="grid">
     <section class="card c12"><div class="card-h"><h2>${L('Cosmetics','Cosmétiques')}</h2>${!LIVE?simPill(L('Demo · nothing is charged','Démo · rien n’est facturé')):''}</div>
-      <div class="seg" role="tablist" aria-label="${L('Category','Catégorie')}" style="margin-bottom:14px">${[['avatar',L('Avatars','Avatars')],['frame',L('Frames','Cadres')],['skin',L('Themes','Thèmes')]].map(x=>`<button type="button" role="tab" aria-selected="${tab===x[0]}" data-act="shopTab" data-a="${x[0]}">${x[1]}</button>`).join('')}</div>
-      ${items.length?`<div class="shop-grid">${items.map(card).join('')}</div>`:`<div class="empty"><b>${L('Nothing on sale here right now','Rien en vente ici pour le moment')}</b></div>`}</section>
+      <div class="seg scroll" role="tablist" aria-label="${L('Category','Catégorie')}" style="margin-bottom:14px;overflow-x:auto">${[['avatar',L('Avatars','Avatars')],['frame',L('Frames','Cadres')],['skin',L('Themes','Thèmes')],['car',L('Cars','Voitures')],['stack','Skyline Stack'],['aim','Pop Shot']].map(x=>`<button type="button" role="tab" aria-selected="${tab===x[0]}" data-act="shopTab" data-a="${x[0]}" style="white-space:nowrap">${x[1]}</button>`).join('')}</div>
+      ${(GROUPS[tab]||[[tab,'','']]).map(([k,title,sub])=>{const its=C.items.filter(i=>i.kind===k);return `${title?`<h3 style="margin:14px 0 4px">${esc(title)}</h3>${sub?`<p class="tiny" style="margin-bottom:8px">${esc(sub)}</p>`:''}`:''}${its.length?`<div class="shop-grid">${its.map(card).join('')}</div>`:`<div class="empty"><b>${L('Nothing on sale here right now','Rien en vente ici pour le moment')}</b></div>`}`;}).join('')}</section>
     <section class="card c8" id="packs"><div class="card-h"><h2>${L('Gems','Gemmes')}</h2>${payReady()?`<span class="tiny">${L('Card payment by Stripe','Paiement par carte via Stripe')}</span>`:`<span class="pill">${L('Card payment coming soon','Paiement par carte bientôt')}</span>`}</div>
       <div class="packs">${packs}</div>
       <p class="tiny" style="margin-top:12px">${L('Prices include VAT. RYVO never sees your card. Gems are only used for cosmetics, can’t be exchanged for money and give no in-game advantage. Under 18: ask a parent before buying.','Prix TTC. RYVO ne voit jamais ta carte. Les gemmes servent uniquement aux cosmétiques, ne s’échangent pas contre de l’argent et ne donnent aucun avantage en jeu. Moins de 18 ans : demande l’accord d’un parent avant d’acheter.')}
@@ -521,7 +528,8 @@ function shopSheetHTML(sh,closeBtn){
   const st=S.data,C=shopCfg();
   if(sh.type==='itemBuy'){
     const it=C.items.find(i=>i.id===sh.id);if(!it)return closeBtn;const miss=it.price-(st.gems||0);
-    return `<div class="modal-h"><div><h2>${esc(L(it.en,it.fr))}</h2><p>${it.kind==='avatar'?'Avatar':it.kind==='frame'?L('Profile frame','Cadre de profil'):L('Theme colour','Couleur du thème')} · ${L('cosmetic only','purement esthétique')}</p></div>${closeBtn}</div>
+    const KN={avatar:'Avatar',frame:L('Profile frame','Cadre de profil'),skin:L('Theme colour','Couleur du thème'),car_model:L('Car model · Neon Sprint','Modèle de voiture · Neon Sprint'),car_paint:L('Car paint · Neon Sprint','Peinture · Neon Sprint'),car_trail:L('Trail · Neon Sprint','Traînée · Neon Sprint'),stack:L('Blocks · Skyline Stack','Blocs · Skyline Stack'),aim:L('Targets · Pop Shot','Cibles · Pop Shot')};
+    return `<div class="modal-h"><div><h2>${esc(L(it.en,it.fr))}</h2><p>${KN[it.kind]||''} · ${L('cosmetic only','purement esthétique')}</p></div>${closeBtn}</div>
       <div class="row" style="justify-content:center;padding:8px 0 4px">${itemPreview(it,80)}</div>
       <dl class="cmp"><dt>${L('Price','Prix')}</dt><dd>${gemTxt(it.price)}</dd><dt>${L('Your balance','Ton solde')}</dt><dd>${gemTxt(st.gems||0)}</dd></dl>
       ${miss>0?`<div class="note">${ic('info')}<span>${L(`You need ${gemTxt(miss)} more.`,`Il te manque ${gemTxt(miss)}.`)}</span></div><button class="btn primary" type="button" data-act="toPacks">${L('Get gems','Obtenir des gemmes')}</button>`
@@ -636,6 +644,8 @@ function renderLayer0(){
   else if(sh.type==='campus')body=campusSheetHTML();
   else if(['itemBuy','packBuy','cgv'].includes(sh.type))body=shopSheetHTML(sh,closeBtn);
   else if(sh.type==='league'&&typeof leagueSheetHTML==='function')body=leagueSheetHTML(sh,closeBtn);
+  else if(sh.type==='opp'&&LIVE)body=oppSheetHTML(sh,closeBtn);
+  else if(sh.type==='live'&&LIVE)body=liveSheetHTML(sh,closeBtn);
   Ly.innerHTML=`<div class="layer" data-act="scrim"><div class="modal" role="dialog" aria-modal="true">${body}</div></div>`;
   const f=Ly.querySelector('input:not([readonly]),.modal button.btn.primary');if(f&&Ly._fresh)setTimeout(()=>{const ae=document.activeElement;if(Ly.contains(f)&&!(ae&&ae!==f&&Ly.contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))try{f.focus();}catch(e){}},30);
 }

@@ -7,7 +7,7 @@ revoke execute on all functions in schema public from public, anon, authenticate
 grant execute on function public.public_info(), public.leaderboard(text,text,int), public.daily_board(text), public.school_cup(), public.recent_activity() to anon, authenticated;
 
 -- joueurs connectés
-grant execute on function public.me(), public.update_profile(jsonb), public.start_run(text,text,int,text,text), public.answer_question(uuid,int,int,numeric),
+grant execute on function public.me(), public.update_profile(jsonb), public.start_run(text,text,int,text,text,uuid,uuid,uuid), public.answer_question(uuid,int,int,numeric),
   public.word_event(uuid,int,text,text), public.submit_run(uuid,jsonb), public.class_cup(), public.report_player(uuid,text,text),
   public.request_verification(text,text), public.add_school(text,text,text), public.export_my_data(), public.delete_my_account(), public.claim_admin_invite() to authenticated;
 
@@ -33,3 +33,7 @@ grant execute on function public.admin_shop(), public.admin_save_item(jsonb), pu
   public.admin_grant_gems(text,int,text), public.admin_purchase_resolve(uuid), public.admin_leagues(text), public.admin_delete_league(uuid) to authenticated;
 -- paiements : uniquement la fonction serveur Stripe, avec la clé service (jamais le site)
 grant execute on function public.shop_pack(text), public.credit_purchase(text,uuid,text,int,text,text), public.refund_purchase(text) to service_role;
+
+-- choisir son adversaire : défis directs et duels en direct
+grant execute on function public.find_players(text,uuid[]), public.my_challenges(), public.decline_challenge(uuid),
+  public.live_invite(uuid,text), public.live_answer(uuid,boolean), public.live_cancel(uuid), public.live_get(uuid), public.live_pending() to authenticated;

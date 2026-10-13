@@ -154,7 +154,7 @@ function buildTrack(P){
   const total=Ls[Ls.length-1],N=360,pts=[];let j=0;
   for(let k=0;k<N;k++){const tg=k*total/N;while(Ls[j+1]<tg)j++;const a=dense[j],b=dense[(j+1)%dense.length],f=(tg-Ls[j])/((Ls[j+1]-Ls[j])||1);pts.push([a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]);}
   const tan=pts.map((p,i)=>{const q=pts[(i+1)%N],o=pts[(i-1+N)%N];return Math.atan2(q[1]-o[1],q[0]-o[0]);});
-  return {pts,tan,N,len:total,half:34,W:1000,H:680,par:+(total*3/250).toFixed(2),slow:+(total*3/125).toFixed(2)};
+  return {pts,tan,N,len:total,half:38,W:1000,H:680,par:+(total*3/250).toFixed(2),slow:+(total*3/125).toFixed(2)};
 }
 const TRACKS=[
   Object.assign(buildTrack([[160,100],[500,80],[820,110],[920,240],[840,350],[660,330],[520,250],[380,320],[420,470],[620,500],[860,490],[910,575],[700,615],[300,600],[120,500],[90,280]]),{name:'City Loop',lv:1,ground:'#E4F4EA',pads:[[40,-12],[150,14],[268,0]],oils:[[105,12],[215,-13]],cones:[[75,17],[185,-17],[322,13]]}),
@@ -350,10 +350,16 @@ const SKINS=[{id:'violet',n:()=>'Violet',lv:1,c:'#5B4BFF'},{id:'coral',n:()=>L('
 /* Boutique : catalogue de démonstration (en ligne, il vient du serveur et ses prix font foi). */
 const SHOP0={items:[['avatar','8','Le Roi','The King',200],['avatar','9','Bandeau','Headband',150],['avatar','10','Chaton','Kitty',200],['avatar','11','Ange','Angel',250],['avatar','12','Roi cool','Cool King',300],['avatar','13','Timide','Shy',150],
   ['frame','neon','Néon','Neon',300],['frame','flame','Flamme','Flame',300],['frame','ice','Glace','Ice',250],['frame','holo','Holo','Holo',400],['frame','royal','Royal','Royal',500],
-  ['skin','night','Nuit','Night',250],['skin','ocean','Océan','Ocean',250],['skin','grape','Raisin','Grape',250],['skin','gold','Or','Gold',400]].map(([kind,ref,fr,en,price])=>({id:kind+':'+ref,kind,ref,fr,en,price})),
+  ['skin','night','Nuit','Night',250],['skin','ocean','Océan','Ocean',250],['skin','grape','Raisin','Grape',250],['skin','gold','Or','Gold',400],
+  ['car_model','kart','Kart','Kart',250],['car_model','f1','Formule','Formula',400],['car_model','pickup','Pick-up','Pickup',300],['car_model','rally','Rallye','Rally',300],['car_model','muscle','Muscle car','Muscle car',350],
+  ['car_paint','flames','Flammes','Flames',200],['car_paint','checker','Damier','Checkered',200],['car_paint','stripes','Bandes de course','Racing stripes',150],['car_paint','camo','Camouflage','Camo',150],['car_paint','chrome','Chrome','Chrome',300],['car_paint','galaxy','Galaxie','Galaxy',350],
+  ['car_trail','neon','Traînée néon','Neon trail',250],['car_trail','rainbow','Arc-en-ciel','Rainbow',350],['car_trail','smoke','Fumée rose','Pink smoke',150],['car_trail','sparks','Étincelles','Sparks',200],['car_trail','hearts','Cœurs','Hearts',200],
+  ['stack','candy','Blocs bonbons','Candy blocks',200],['stack','glass','Blocs de verre','Glass blocks',250],['stack','neon','Blocs néon','Neon blocks',300],['stack','gold','Lingots d’or','Gold bars',400],
+  ['aim','ocean','Bulles océan','Ocean bubbles',200],['aim','melon','Pastèques','Watermelons',200],['aim','donut','Donuts','Donuts',250],['aim','planet','Planètes','Planets',300]].map(([kind,ref,fr,en,price])=>({id:kind+':'+ref,kind,ref,fr,en,price})),
   packs:[{id:'s',gems:100,cents:99},{id:'m',gems:550,cents:499},{id:'l',gems:1200,cents:999}],ad_gems:10,ad_per_day:5,ad_gap_s:45,league_plus:300};
 const shopCfg=()=>(LIVE&&typeof NET!=='undefined'&&NET.info&&NET.info.shop)||SHOP0;
 const itemOf=(kind,ref)=>shopCfg().items.find(i=>i.kind===kind&&i.ref===String(ref));
+const GEAR_KINDS=['car_model','car_paint','car_trail','stack','aim'];
 const ownsItem=(kind,ref)=>(S.data.owned||[]).includes(kind+':'+ref);
 const eur=c=>(c/100).toLocaleString(LOC(),{style:'currency',currency:'EUR'});
 const gemTxt=n=>`${fmt(n)} ${plural(n,'gem','gems','gemme','gemmes')}`;
@@ -399,7 +405,7 @@ let STORAGE_OK=true;
 function addDays(n){const d=new Date();d.setHours(18,0,0,0);d.setDate(d.getDate()+n);return d.getTime();}
 const DEF=()=>({v:2,lang:null,sound:true,
   account:{signedIn:false,username:LIVE?'invite':'ace_rookie',avatar:0,frame:'basic',skin:'violet'},
-  gems:0,owned:[],ads:{day:null,n:0,last:0},
+  gems:0,owned:[],gear:{},ads:{day:null,n:0,last:0},
   school:{id:LIVE?null:'nbu',program:'bus2',year:LIVE?null:'2',status:'unverified',domain:null},
   xp:0,rating:1000,streak:0,lastDay:null,
   bests:{},ghosts:{},history:[],
