@@ -483,6 +483,11 @@ button.ccard[disabled]{opacity:.5;cursor:default}
 .schools li{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;cursor:pointer;border:2px solid transparent}
 .schools li:hover{background:var(--wash)}
 .schools li[aria-selected="true"]{border-color:var(--ink);background:var(--brand-soft)}
+.schools:empty{display:none}
+.schools li.addrow{border:2px dashed var(--line)}
+.schools li.addrow:hover{border-color:var(--ink)}
+.addbox{border:2px solid var(--line);border-radius:16px;padding:14px;background:var(--wash)}
+.opp.picked{border-color:var(--ink)}
 .crest{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font:800 11px/1 var(--f-d);color:#fff;flex:none;border:2px solid var(--ink)}
 .chart text{fill:var(--ink2);font:600 10px var(--f-m)}
 .chart .gl line{stroke:var(--line);stroke-width:1}
@@ -663,6 +668,13 @@ const ctry=s=>L(s.country[0],s.country[1]);
 const PROGRAMS={bus1:['Business · Year 1','Commerce · 1re année'],bus2:['Business · Year 2','Commerce · 2e année'],eng1:['Engineering · Year 1','Ingénierie · 1re année'],eng2:['Engineering · Year 2','Ingénierie · 2e année'],log1:['Logistics · Master 1','Logistique · Master 1'],des3:['Design · Year 3','Design · 3e année'],cs2:['Computer Science · Year 2','Informatique · 2e année'],law1:['Law · Year 1','Droit · 1re année']};
 const PROG_IDS=Object.keys(PROGRAMS);
 const prog=id=>PROGRAMS[id]?L(PROGRAMS[id][0],PROGRAMS[id][1]):'—';
+/* Année d'études déclarée par le joueur. « Promo » = même école + même année. */
+const YEARS={'1':['Year 1','1re année'],'2':['Year 2','2e année'],'3':['Year 3','3e année'],'4':['Year 4','4e année'],'5':['Year 5','5e année'],'6':['Year 6 or more','6e année et plus']};
+const YEAR_IDS=Object.keys(YEARS);
+const yearName=y=>YEARS[y]?L(YEARS[y][0],YEARS[y][1]):'—';
+const yearLong=y=>YEARS[y]?yearName(y)+' · Bac+'+(y==='6'?'6+':y):'—';
+const P2Y={bus1:'1',bus2:'2',eng1:'1',eng2:'2',log1:'4',des3:'3',cs2:'2',law1:'1'};
+const normTxt=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/œ/g,'oe').replace(/æ/g,'ae').replace(/[^a-z0-9]+/g,'');
 
 /* Neon Sprint tracks: closed Catmull-Rom loops, resampled to 360 even steps. */
 function buildTrack(P){
@@ -846,7 +858,7 @@ const DEMO=(()=>{
     best.grid=miss()?null:Math.round(1800+s*5600+r()*800);
     best.words=miss()?null:Math.round(1200+s*5200+r()*700);
     best.aim=miss()?null:Math.round(3200+s*8800+r()*1500);
-    out.push({id:'p'+i,name,face:demoFace('p'+i),school,program,skill:s,rating:Math.round(860+s*800+(r()-.5)*140),best,weekly:Math.round(80+s*900+r()*420),monthly:Math.round(400+s*3200+r()*1300)});
+    out.push({id:'p'+i,name,face:demoFace('p'+i),school,program,year:P2Y[program],skill:s,rating:Math.round(860+s*800+(r()-.5)*140),best,weekly:Math.round(80+s*900+r()*420),monthly:Math.round(400+s*3200+r()*1300)});
   }
   return out;
 })();
@@ -902,7 +914,7 @@ let STORAGE_OK=true;
 function addDays(n){const d=new Date();d.setHours(18,0,0,0);d.setDate(d.getDate()+n);return d.getTime();}
 const DEF=()=>({v:2,lang:null,sound:true,
   account:{signedIn:false,username:LIVE?'invite':'ace_rookie',avatar:0,frame:'basic',skin:'violet'},
-  school:{id:'nbu',program:'bus2',status:'unverified',domain:null},
+  school:{id:LIVE?null:'nbu',program:'bus2',year:LIVE?null:'2',status:'unverified',domain:null},
   xp:0,rating:1000,streak:0,lastDay:null,
   bests:{},ghosts:{},history:[],
   daily:{day:dayKey(),att:{},best:{}},missions:{day:dayKey(),claimed:[]},ach:[],schoolPts:0,
@@ -929,9 +941,11 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S.data));}catch(e){S
 
 const S={route:'home',data:null,game:null,result:null,ctrl:null,
   ui:{lib:{cat:'all',mode:'all',diff:'all',sort:'pop'},rank:{view:'players',scope:'world',board:'rating',loading:false},
-      lobby:{game:null,mode:'trial',oppId:null,track:0,cat:'mix'},sheet:null,notif:false,campus:{edit:false,q:'',pick:null,program:null,err:null},
+      lobby:{game:null,mode:'trial',oppId:null,track:0,cat:'mix'},sheet:null,notif:false,campus:{edit:false,q:'',pick:null,year:null,err:null,adding:false,nn:'',nc:'',nco:''},
       admin:{err:null},calc:{mau:20000,conv:2,price:3.99,inst:5,instPrice:2400,spons:4,sponsPrice:1500}}};
 S.data=load();
+/* écoles ajoutées par le joueur en mode démo (en ligne, elles viennent du serveur) */
+if(!LIVE)(S.data.customSchools||[]).forEach(x=>{if(!SCH[x.id]){SCHOOLS.push(x);SCH[x.id]=x;}});
 LANG=S.data.lang||((navigator.language||'en').toLowerCase().startsWith('fr')?'fr':'en');
 document.documentElement.lang=LANG;
 
@@ -964,12 +978,12 @@ function BOARD(b){
   return {n:skName(b),lower:lower(b),f:v=>fmtScore(b,v)};
 }
 const BOARD_IDS=['rating',...SKS,'weekly','monthly'];
-const SCOPES=[['friends',()=>L('Friends','Amis')],['class',()=>L('Class','Classe')],['school',()=>L('School','École')],['city',()=>L('City','Ville')],['country',()=>L('Country','Pays')],['world',()=>L('World','Monde')]];
+const SCOPES=[['friends',()=>L('Friends','Amis')],['class',()=>L('Class','Promo')],['school',()=>L('School','École')],['city',()=>L('City','Ville')],['country',()=>L('Country','Pays')],['world',()=>L('World','Monde')]];
 function inScope(p,scope){
   const st=S.data,my=SCH[st.school.id],s=SCH[p.school];
   switch(scope){
     case 'friends':return FRIENDS.includes(p.id);
-    case 'class':return !!my&&p.school===st.school.id&&p.program===st.school.program;
+    case 'class':return !!my&&!!st.school.year&&p.school===st.school.id&&p.year===st.school.year;
     case 'school':return !!my&&p.school===st.school.id;
     case 'city':return !!my&&s.city===my.city;
     case 'country':return !!my&&s.country[0]===my.country[0];
@@ -1007,9 +1021,9 @@ function uniRows(){
 }
 function classRows(){
   const st=S.data;if(!SCH[st.school.id])return [];
-  const map={};PROG_IDS.forEach(p=>map[p]={id:p,pts:900+hashStr(p+st.school.id+weekStart())%1800,members:0,mine:p===st.school.program});
-  DEMO.filter(p=>p.school===st.school.id).forEach(p=>{map[p.program].pts+=p.weekly;map[p.program].members++;});
-  if(map[st.school.program]){map[st.school.program].pts+=st.schoolPts;map[st.school.program].members++;}
+  const map={};YEAR_IDS.slice(0,5).forEach(y=>map[y]={id:y,pts:900+hashStr(y+st.school.id+weekStart())%1800,members:0,mine:y===st.school.year});
+  DEMO.filter(p=>p.school===st.school.id).forEach(p=>{if(map[p.year]){map[p.year].pts+=p.weekly;map[p.year].members++;}});
+  if(map[st.school.year]){map[st.school.year].pts+=st.schoolPts;map[st.school.year].members++;}
   const rows=Object.values(map).sort((a,b)=>b.pts-a.pts);
   rows.forEach((r,i)=>{r.pos=i+1;const h=hashStr(r.id+'cmv'+weekStart());r.mv=h%3===0?0:(h%5)-2;});
   return rows;
@@ -1100,10 +1114,10 @@ function podium(rows,B){
   return `<div class="podium" aria-hidden="true">${order.map((r,i)=>`<div class="pod ${cls[i]}${r.me?' me':''}">${avP(r,i===1?54:42)}<span class="nm">${esc(r.name)}</span><span class="val">${B.f(r.val)}</span><div class="blk">${r.pos}</div></div>`).join('')}</div>`;
 }
 function uniList(rows){
-  return `<div class="lb">${rows.map(u=>`<div class="lb-row${u.mine?' me':''}${u.pos<=3?' top':''}"><span class="pos">${u.pos}</span><span class="who"><span class="crest" style="background:${u.col}">${u.short}</span><span class="nm"><b>${esc(u.name)}${u.mine?`<em>${L('Yours','Ton école')}</em>`:''}</b><small>${u.city} · ${u.members} ${L('demo players','joueurs démo')}${u.mine&&u.you?` · +${fmt(u.you)} ${L('from you','grâce à toi')}`:''}</small></span></span><span class="val">${fmt(u.pts)}</span>${mvHTML(u.mv)}</div>`).join('')}</div>`;
+  return `<div class="lb">${rows.map(u=>`<div class="lb-row${u.mine?' me':''}${u.pos<=3?' top':''}"><span class="pos">${u.pos}</span><span class="who"><span class="crest" style="background:${u.col}">${u.short}</span><span class="nm"><b>${esc(u.name)}${u.mine?`<em>${L('Yours','Ton école')}</em>`:''}</b><small>${esc(u.city)} · ${u.members} ${LIVE?plural(u.members,'player','players','joueur','joueurs'):L('demo players','joueurs démo')}${u.mine&&u.you?` · +${fmt(u.you)} ${L('from you','grâce à toi')}`:''}</small></span></span><span class="val">${fmt(u.pts)}</span>${mvHTML(u.mv)}</div>`).join('')}</div>`;
 }
 function classList(rows){
-  return `<div class="lb">${rows.map(r=>`<div class="lb-row${r.mine?' me':''}${r.pos<=3?' top':''}"><span class="pos">${r.pos}</span><span class="who"><span class="nm"><b>${esc(prog(r.id))}${r.mine?`<em>${L('Your class','Ta classe')}</em>`:''}</b><small>${r.members} ${L('demo players','joueurs démo')}</small></span></span><span class="val">${fmt(r.pts)}</span>${mvHTML(r.mv)}</div>`).join('')}</div>`;
+  return `<div class="lb">${rows.map(r=>`<div class="lb-row${r.mine?' me':''}${r.pos<=3?' top':''}"><span class="pos">${r.pos}</span><span class="who"><span class="nm"><b>${esc(yearLong(r.id))}${r.mine?`<em>${L('Your class','Ta promo')}</em>`:''}</b><small>${r.members} ${LIVE?plural(r.members,'player','players','joueur','joueurs'):L('demo players','joueurs démo')}</small></span></span><span class="val">${fmt(r.pts)}</span>${mvHTML(r.mv)}</div>`).join('')}</div>`;
 }
 function sparkline(vals,lw){
   if(vals.length<2)return `<p class="tiny">${L('Play twice to see your trend.','Joue deux fois pour voir ta tendance.')}</p>`;
@@ -1246,7 +1260,7 @@ VIEWS.lobby=()=>{
     modePanel=`<div class="row"><span class="pill warn">${left}/3 ${L('attempts left','essais restants')}</span><span class="tiny">${L('Today’s best','Record du jour')} : <b>${fmtScore(sk,st.daily.best[g.id])}</b></span></div>${lbList(dailyRows(sk),BOARD(sk),5,L('Post a Daily score to appear here.','Joue le défi pour apparaître ici.'))}`;
   }else if(Lb.mode==='school'){
     const s=SCH[st.school.id];
-    modePanel=s?`<div class="opp"><span class="crest" style="background:${s.col}">${s.short}</span><div><b>${esc(s.name)}</b><p class="tiny">${esc(prog(st.school.program))} · ${st.school.status==='pending'?L('verification pending','vérification en cours'):L('unverified (demo)','non vérifié (démo)')}</p><p class="tiny">${L('This run adds 50 to 200 Cup points depending on performance.','Cette partie rapporte 50 à 200 points selon ta performance.')}</p></div></div>`
+    modePanel=s?`<div class="opp"><span class="crest" style="background:${s.col}">${s.short}</span><div><b>${esc(s.name)}</b><p class="tiny">${st.school.year?esc(yearName(st.school.year))+' · ':''}${LIVE?esc(s.city)+(st.school.status==='verified'?' · '+L('verified','vérifié'):''):st.school.status==='pending'?L('verification pending','vérification en cours'):L('unverified (demo)','non vérifié (démo)')}</p><p class="tiny">${L('This run adds 50 to 200 Cup points depending on performance.','Cette partie rapporte 50 à 200 points selon ta performance.')}</p></div></div>`
       :`<div class="empty"><b>${L('No school linked','Aucune école liée')}</b>${L('Link your university to play for it.','Lie ton université pour jouer pour elle.')}<button class="btn sm" type="button" data-act="go" data-a="campus">${L('Link a school','Lier une école')}</button></div>`;
   }else{
     modePanel=`<p class="tiny">${L('Your result is compared with every ranked player. Personal bests replace your leaderboard entry.','Ton résultat est comparé à tous les joueurs classés. Ton record remplace ton entrée au classement.')}${g.id==='sprint'?' '+L('Your fastest race on each track is saved as a ghost.','Ta course la plus rapide sur chaque circuit devient un fantôme.'):''}</p>`;
@@ -1341,17 +1355,18 @@ VIEWS.result=()=>{
 
 VIEWS.ranks=()=>{
   const u=S.ui.rank,st=S.data,hasSchool=!!SCH[st.school.id];
-  const head=`<div class="page-h"><div><p class="eyebrow">${L('Rankings','Classements')}</p><h1>${L('Where you stand','Où tu te situes')}</h1><p>${L('Switch between friends, class, school, city, country and world. Your row stays visible even outside the top 10.','Passe des amis à la classe, l’école, la ville, le pays et le monde. Ta ligne reste visible même hors du top 10.')}</p></div>${simPill(L('Demo roster · not verified','Joueurs démo · non vérifié'))}</div>
-  <div class="seg" role="tablist" aria-label="${L('Ranking type','Type de classement')}">${[['players',L('Players','Joueurs')],['unis',L('Universities','Universités')],['classes',L('Classes','Classes')]].map(v=>`<button type="button" role="tab" aria-selected="${u.view===v[0]}" data-act="rview" data-a="${v[0]}">${v[1]}</button>`).join('')}</div>`;
-  if(u.view==='unis')return head+`<section class="card" style="margin-top:18px"><div class="card-h"><div class="l"><h2>${L('School Cup · this week','Coupe des écoles · cette semaine')}</h2>${simPill(L('Fictional institutions','Établissements fictifs'))}</div></div>${uniList(uniRows())}<p class="tiny">${L('These universities are invented. In production, only verified students’ results would count.','Ces universités sont inventées. En production, seuls les résultats d’étudiants vérifiés compteraient.')}</p></section>`;
-  if(u.view==='classes'){const rows=classRows();return head+`<section class="card" style="margin-top:18px"><div class="card-h"><div class="l"><h2>${L('Classes','Classes')}${hasSchool?' · '+esc(SCH[st.school.id].name):''}</h2>${simPill()}</div></div>${rows.length?classList(rows):`<div class="empty"><b>${L('Link a school to see class standings','Lie une école pour voir les classes')}</b><button class="btn sm" type="button" data-act="go" data-a="campus">${L('Link a school','Lier une école')}</button></div>`}</section>`;}
+  const head=`<div class="page-h"><div><p class="eyebrow">${L('Rankings','Classements')}</p><h1>${L('Where you stand','Où tu te situes')}</h1><p>${L('Switch between friends, class, school, city, country and world. Your row stays visible even outside the top 10.','Passe des amis à ta promo, ton école, ta ville, ton pays et le monde. Ta ligne reste visible même hors du top 10.')}</p></div>${LIVE?'':simPill(L('Demo roster · not verified','Joueurs démo · non vérifié'))}</div>
+  <div class="seg" role="tablist" aria-label="${L('Ranking type','Type de classement')}">${[['players',L('Players','Joueurs')],['unis',L('Schools','Écoles')],['classes',L('Classes','Promos')]].map(v=>`<button type="button" role="tab" aria-selected="${u.view===v[0]}" data-act="rview" data-a="${v[0]}">${v[1]}</button>`).join('')}</div>`;
+  if(u.view==='unis')return head+`<section class="card" style="margin-top:18px"><div class="card-h"><div class="l"><h2>${L('School Cup · this week','Coupe des écoles · cette semaine')}</h2>${LIVE?'':simPill(L('Fictional institutions','Établissements fictifs'))}</div></div>${(()=>{const u=uniRows();return u.length?uniList(u):`<div class="empty"><b>${L('No school has played yet this week','Aucune école n’a encore joué cette semaine')}</b>${L('Add your school in Campus and play a School Cup run.','Ajoute ton école dans Campus et joue une partie de Coupe.')}<button class="btn sm" type="button" data-act="go" data-a="campus">Campus</button></div>`;})()}<p class="tiny">${LIVE?L('Schools are added by the players themselves. Standings reset every Monday.','Les écoles sont ajoutées par les joueurs eux-mêmes. Remise à zéro chaque lundi.'):L('These universities are invented. In production, only verified students’ results would count.','Ces universités sont inventées. En production, seuls les résultats d’étudiants vérifiés compteraient.')}</p></section>`;
+  if(u.view==='classes'){const rows=classRows();return head+`<section class="card" style="margin-top:18px"><div class="card-h"><div class="l"><h2>${L('Classes','Promos')}${hasSchool?' · '+esc(SCH[st.school.id].name):''}</h2>${LIVE?'':simPill()}</div></div>${rows.length?classList(rows):`<div class="empty"><b>${hasSchool?L('No class has played yet this week','Aucune promo n’a encore joué cette semaine'):L('Add your school and year to see class standings','Indique ton école et ton année pour voir les promos')}</b><button class="btn sm" type="button" data-act="go" data-a="campus">${L('Link a school','Lier une école')}</button></div>`}</section>`;}
   const B=BOARD(u.board);let body;
   if(u.loading)body=`<div class="lb" aria-busy="true">${'<div class="skel"></div>'.repeat(6)}</div>`;
+  else if(u.scope==='class'&&hasSchool&&!st.school.year)body=`<div class="empty"><b>${L('Add your year of study','Indique ton année d’études')}</b>${L('Your class is everyone in your school and your year.','Ta promo, ce sont les joueurs de ton école et de ton année.')}<button class="btn sm primary" type="button" data-act="campusEdit">${L('Add my year','Indiquer mon année')}</button></div>`;
   else if(['class','school','city','country'].includes(u.scope)&&!hasSchool)body=`<div class="empty"><b>${L('This ranking needs a school','Ce classement nécessite une école')}</b>${L('Link your university to compare with classmates, your campus and your city.','Lie ton université pour te comparer à ta classe, ton campus et ta ville.')}<button class="btn sm primary" type="button" data-act="go" data-a="campus">${L('Link a school','Lier une école')}</button></div>`;
   else{const data=boardRows(u.board,u.scope),key=u.board+':'+u.scope;if(data.me){const prev=st.seen[key];data.me.mv=prev?prev-data.me.pos:0;S._seen=[key,data.me.pos];}body=podium(data.rows,B)+lbList(data,B,10,u.board==='weekly'||u.board==='monthly'?L('Play a match to earn points.','Joue un match pour gagner des points.'):L('Set a score to appear here.','Fais un score pour apparaître ici.'));}
   const scopeName=SCOPES.find(s=>s[0]===u.scope)[1]();
   const my=SCH[st.school.id];
-  const sub=u.scope==='class'&&my?prog(st.school.program):u.scope==='school'&&my?my.name:u.scope==='city'&&my?my.city:u.scope==='country'&&my?ctry(my):u.scope==='friends'?FRIENDS.length+' '+L('friends','amis'):L('All players','Tous les joueurs');
+  const sub=u.scope==='class'&&my?my.short+' · '+yearName(st.school.year):u.scope==='school'&&my?my.name:u.scope==='city'&&my?my.city:u.scope==='country'&&my?ctry(my):u.scope==='friends'?FRIENDS.length+' '+L('friends','amis'):L('All players','Tous les joueurs');
   return head+`
   <div class="chips scroll" role="tablist" aria-label="${L('Scope','Portée')}" style="margin-top:16px">${SCOPES.map(s=>`<button class="chip" type="button" role="tab" aria-selected="${u.scope===s[0]}" data-act="rscope" data-a="${s[0]}">${s[1]()}</button>`).join('')}</div>
   <section class="card" style="margin-top:12px">
@@ -1362,27 +1377,54 @@ VIEWS.ranks=()=>{
   </section>`;
 };
 
-function schoolFilter(q){q=q.trim().toLowerCase();return SCHOOLS.filter(x=>!q||x.name.toLowerCase().includes(q)||x.city.toLowerCase().includes(q)||x.short.toLowerCase().includes(q));}
+function schoolFilter(q){const n=normTxt(q);
+  return SCHOOLS.filter(x=>!n||normTxt(x.name).includes(n)||normTxt(x.city).includes(n)||normTxt(x.short).includes(n))
+    .sort((a,b)=>(n&&normTxt(b.short)===n)-(n&&normTxt(a.short)===n)||(b.members||0)-(a.members||0)||a.name.localeCompare(b.name)).slice(0,n?10:6);}
 function schoolListHTML(list){
-  const c=S.ui.campus,sel=c.pick||S.data.school.id;
-  if(!list.length)return `<li class="empty" style="cursor:default"><b>${L('No institution found','Aucun établissement trouvé')}</b>${L('Check the spelling. In production, a partner team would add missing schools.','Vérifie l’orthographe. En production, une équipe ajouterait les écoles manquantes.')}</li>`;
-  return list.map(x=>`<li role="option" tabindex="0" aria-selected="${sel===x.id}" data-act="campusPick" data-a="${x.id}"><span class="crest" style="background:${x.col}">${x.short}</span><span style="min-width:0"><b>${esc(x.name)}</b><span class="tiny" style="display:block">${x.city}, ${ctry(x)} · ${L('demo','démo')}</span></span></li>`).join('');
+  const c=S.ui.campus,sel=c.pick||S.data.school.id,q=(c.q||'').trim(),n=normTxt(q);
+  const exact=n&&SCHOOLS.some(x=>normTxt(x.name)===n);
+  const add=q.length>=3&&!exact?`<li class="addrow" role="option" tabindex="0" aria-selected="false" data-act="campusAdd"><span class="crest" style="background:var(--ink)">+</span><span style="min-width:0"><b>${L('Add','Ajouter')} « ${esc(q)} »</b><span class="tiny" style="display:block">${L('Not in the list? Add your school, everyone will see it.','Pas dans la liste ? Ajoute ton école, tout le monde la verra.')}</span></span></li>`:'';
+  if(!list.length)return `<li class="empty" style="cursor:default"><b>${q?L('No school found','Aucune école trouvée'):LIVE?L('No school yet','Aucune école pour l’instant'):L('No institution found','Aucun établissement trouvé')}</b>${q.length>=3?L('Check the spelling, or add it below.','Vérifie l’orthographe, ou ajoute-la ci-dessous.'):L('Type the name of your school or university.','Tape le nom de ton école ou université.')}</li>`+add;
+  return list.map(x=>`<li role="option" tabindex="0" aria-selected="${sel===x.id}" data-act="campusPick" data-a="${x.id}"><span class="crest" style="background:${x.col}">${esc(x.short)}</span><span style="min-width:0"><b>${esc(x.name)}</b><span class="tiny" style="display:block">${esc(x.city)}, ${esc(ctry(x))} · ${LIVE?(x.members||0)+' '+plural(x.members||0,'player','players','joueur','joueurs'):x.custom?L('added by you','ajoutée par toi'):L('demo','démo')}</span></span></li>`).join('')+add;
+}
+function schoolPickerHTML(inSheet){
+  const st=S.data,c=S.ui.campus,s=SCH[st.school.id],pick=SCH[c.pick||st.school.id],lock=LIVE&&NET.me&&NET.me.school_lock_until;
+  const err=c.err&&!c.err.startsWith('v:')?`<div class="note err">${ic('info')}<span>${esc(c.err)}</span></div>`:'';
+  let school;
+  if(c.adding)school=`<div class="addbox stack">
+      <b>${L('Add your school','Ajoute ton école')}</b>
+      <div class="field"><label for="nsName">${L('Full name','Nom complet')}</label><input class="input" id="nsName" data-in="campusNew" data-k="nn" maxlength="80" value="${esc(c.nn)}" placeholder="${L('e.g. EM Normandie','ex. EM Normandie')}" autocomplete="off"><span class="help">${L('Write it as on the school’s website. Use capitals for initials (EM, HEC…).','Écris-le comme sur le site de l’école. Mets les sigles en majuscules (EM, HEC…).')}</span></div>
+      <div class="row" style="align-items:flex-start">
+        <div class="field" style="flex:1;min-width:140px"><label for="nsCity">${L('City (campus)','Ville (campus)')}</label><input class="input" id="nsCity" data-in="campusNew" data-k="nc" maxlength="60" value="${esc(c.nc)}" autocomplete="address-level2"></div>
+        <div class="field" style="flex:1;min-width:120px"><label for="nsCountry">${L('Country','Pays')}</label><input class="input" id="nsCountry" data-in="campusNew" data-k="nco" maxlength="40" value="${esc(c.nco||'France')}" autocomplete="country-name"></div>
+      </div>
+      <div class="row"><button class="btn primary sm" type="button" data-act="campusAddConfirm">${L('Add this school','Ajouter cette école')}</button><button class="btn ghost sm" type="button" data-act="campusAddCancel">${L('Back to the list','Retour à la liste')}</button></div></div>`;
+  else school=`${pick?`<div class="opp picked"><span class="crest" style="background:${pick.col}">${esc(pick.short)}</span><div style="min-width:0;flex:1"><b>${esc(pick.name)}</b><p class="tiny">${esc(pick.city)}, ${esc(ctry(pick))}</p></div><span class="pill now">${ic('check',14)}${L('Selected','Choisie')}</span></div>`:''}
+    <div class="field"><label for="schoolQ">${pick?L('Pick another school','Choisir une autre école'):L('Your school or university','Ton école ou université')}</label><input class="input" id="schoolQ" data-in="schoolQ" value="${esc(c.q)}" placeholder="${L('Name, city or initials','Nom, ville ou sigle')}" autocomplete="off"></div>
+    <ul class="schools" id="schoolList" role="listbox" aria-label="${L('Schools','Écoles')}">${pick&&!c.q?'':schoolListHTML(schoolFilter(c.q))}</ul>`;
+  const year=`<div class="field"><label for="yearSel">${L('Your year of study','Ton année d’études')}</label><select class="input" id="yearSel" data-ch="campusYear"><option value="">${L('Choose…','Choisis…')}</option>${YEAR_IDS.map(y=>`<option value="${y}" ${(c.year||'')===y?'selected':''}>${esc(yearLong(y))}</option>`).join('')}</select><span class="help">${L('Your class (“promo”) is everyone in your school and your year.','Ta promo, ce sont les joueurs de ton école et de ton année.')}</span></div>`;
+  const lockNote=lock&&s?`<p class="tiny">${L(`You can switch to another school from ${dateLabel(lock)}. Your year can be changed anytime.`,`Tu pourras changer d’école à partir du ${dateLabel(lock)}. L’année se modifie à tout moment.`)}</p>`:LIVE?`<p class="tiny">${L('You can correct your school for 24 hours, then it stays for 30 days.','Tu peux corriger ton école pendant 24 h, ensuite elle reste 30 jours.')}</p>`:'';
+  const btns=inSheet?`<div class="row"><button class="btn primary" type="button" data-act="campusSave">${L('Save','Enregistrer')}</button><button class="btn ghost" type="button" data-act="campusLater">${L('Later','Plus tard')}</button></div>`
+    :`<div class="row"><button class="btn primary" type="button" data-act="campusSave">${L('Save','Enregistrer')}</button>${s?`<button class="btn ghost" type="button" data-act="campusCancel">${L('Cancel','Annuler')}</button><button class="btn ghost" type="button" data-act="campusRemove">${L('Leave this school','Quitter cette école')}</button>`:''}</div>`;
+  return `<div class="stack">${school}${year}${err}${c.adding?'':btns}${lockNote}</div>`;
+}
+function campusSheetHTML(){
+  return `<div class="modal-h"><div><h2>${L('Your school and year','Ton école et ton année')}</h2><p>${L('Play for your school in the School Cup and compare yourself with your class.','Joue pour ton école dans la Coupe des écoles et compare-toi à ta promo.')}</p></div><button class="iconbtn" type="button" data-act="campusLater" aria-label="${L('Close','Fermer')}">${ic('x')}</button></div>${schoolPickerHTML(true)}`;
 }
 VIEWS.campus=()=>{
   const st=S.data,c=S.ui.campus,s=SCH[st.school.id];
-  const status=st.school.status==='verified'?`<span class="pill now">${L('Verified','Vérifié')}</span>`:st.school.status==='pending'?`<span class="pill warn">${L('Pending · demo','En attente · démo')}</span>`:s?`<span class="pill">${L('Unverified','Non vérifié')}</span>`:'';
+  const status=st.school.status==='verified'?`<span class="pill now">${L('Verified','Vérifié')}</span>`:st.school.status==='pending'?`<span class="pill warn">${LIVE?L('Badge pending','Badge en attente'):L('Pending · demo','En attente · démo')}</span>`:s&&!LIVE?`<span class="pill">${L('Unverified','Non vérifié')}</span>`:'';
   let assoc;
-  if(c.edit||!s){
-    assoc=`<div class="field"><label for="schoolQ">${L('Search institutions','Rechercher un établissement')}</label><input class="input" id="schoolQ" data-in="schoolQ" value="${esc(c.q)}" placeholder="${L('Name, city or initials','Nom, ville ou sigle')}" autocomplete="off"></div>
-    <ul class="schools" id="schoolList" role="listbox" aria-label="${L('Institutions','Établissements')}">${schoolListHTML(schoolFilter(c.q))}</ul>
-    <div class="field"><label for="progSel">${L('Class or program','Classe ou programme')}</label><select class="input" id="progSel" data-ch="campusProg">${PROG_IDS.map(p=>`<option value="${p}" ${((c.program||st.school.program)===p)?'selected':''}>${esc(prog(p))}</option>`).join('')}</select></div>
-    ${c.err&&!c.err.startsWith('v:')?`<div class="note err">${ic('info')}<span>${esc(c.err)}</span></div>`:''}
-    <div class="row"><button class="btn primary" type="button" data-act="campusSave">${L('Save school','Enregistrer')}</button>${s?`<button class="btn ghost" type="button" data-act="campusCancel">${L('Cancel','Annuler')}</button><button class="btn ghost" type="button" data-act="campusRemove">${L('Unlink','Délier')}</button>`:''}</div>`;
+  const sheetOpen=S.ui.sheet&&S.ui.sheet.type==='campus';
+  if(sheetOpen)assoc=`<p class="tiny">${L('Editing in the window above.','Modification en cours dans la fenêtre.')}</p>`;
+  else if(c.edit||!s||!st.school.year&&LIVE){
+    if(!c.edit)Object.assign(c,{pick:c.pick||st.school.id||null,year:c.year||st.school.year||null});
+    assoc=schoolPickerHTML(false);
   }else{
-    assoc=`<div class="opp"><span class="crest" style="background:${s.col}">${s.short}</span><div style="min-width:0;flex:1"><b>${esc(s.name)}</b><p class="tiny">${esc(prog(st.school.program))} · ${s.city}, ${ctry(s)}</p></div>${status}</div>
-    <button class="btn sm" type="button" data-act="campusEdit">${L('Change school or program','Changer d’école ou de programme')}</button>`;
+    assoc=`<div class="opp"><span class="crest" style="background:${s.col}">${esc(s.short)}</span><div style="min-width:0;flex:1"><b>${esc(s.name)}</b><p class="tiny">${st.school.year?esc(yearLong(st.school.year)):L('Year not set','Année non renseignée')} · ${esc(s.city)}, ${esc(ctry(s))}</p></div></div>
+    <button class="btn sm" type="button" data-act="campusEdit">${L('Change school or year','Changer d’école ou d’année')}</button>`;
   }
-  const verify=s?(st.school.status==='verified'?`<div class="note" style="border-color:var(--good);background:var(--good-soft)">${ic('check')}<span>${L('Your enrollment is verified. Your School Cup points count for','Ton inscription est vérifiée. Tes points de Coupe comptent pour')} ${esc(s.short)}.</span></div>`:st.school.status==='pending'&&LIVE?livePendingHTML(s):st.school.status==='pending'?`
+  const verify=s?(LIVE&&!s.domain&&st.school.status!=='verified'?`<div class="note">${ic('info')}<span>${L('The verified badge is optional: your points already count for your school. It becomes available once the RYVO team has added your school’s email domain.','Le badge « vérifié » est facultatif : tes points comptent déjà pour ton école. Il sera disponible quand l’équipe RYVO aura ajouté le domaine e-mail de ton école.')}</span></div>`:st.school.status==='verified'?`<div class="note" style="border-color:var(--good);background:var(--good-soft)">${ic('check')}<span>${L('Your enrollment is verified. Your School Cup points count for','Ton inscription est vérifiée. Tes points de Coupe comptent pour')} ${esc(s.short)}.</span></div>`:st.school.status==='pending'&&LIVE?livePendingHTML(s):st.school.status==='pending'?`
     <ol class="steps">
       <li><div><b>${L('Institutional address entered','Adresse institutionnelle saisie')}</b><small>…@${esc(st.school.domain||s.domain)} ${L('matches','correspond à')} ${esc(s.short)}.</small></div><span class="pill now">${L('Done','Fait')}</span></li>
       <li><div><b>${L('Inbox check','Vérification de la boîte mail')}</b><small>${L('In production we email a single-use 6-digit code. This demo has no mail server, so no code was sent.','En production, on envoie un code unique à 6 chiffres. Cette démo n’a pas de serveur mail : aucun code n’a été envoyé.')}</small></div><span class="pill warn">${L('Not sent','Non envoyé')}</span></li>
@@ -1395,19 +1437,19 @@ VIEWS.campus=()=>{
       <button class="btn" type="submit">${L('Start verification','Lancer la vérification')}</button></form>`)
     :`<div class="empty"><b>${L('Link a school first','Lie d’abord une école')}</b>${L('Verification starts once you’ve picked your institution.','La vérification commence une fois ton établissement choisi.')}</div>`;
   const unis=uniRows(),mine=unis.find(u=>u.mine);
-  return `<div class="page-h"><div><p class="eyebrow">Campus</p><h1>${L('Play for your school','Joue pour ton école')}</h1><p>${L('Every School Cup run adds points to your university and your class. Standings reset every Monday.','Chaque partie de Coupe rapporte des points à ton université et ta classe. Remise à zéro chaque lundi.')}</p></div>${simPill(L('Fictional institutions','Établissements fictifs'))}</div>
+  return `<div class="page-h"><div><p class="eyebrow">Campus</p><h1>${L('Play for your school','Joue pour ton école')}</h1><p>${L('Every School Cup run adds points to your school and your class. Standings reset every Monday.','Chaque partie de Coupe rapporte des points à ton école et à ta promo. Remise à zéro chaque lundi.')}</p></div>${LIVE?'':simPill(L('Fictional institutions','Établissements fictifs'))}</div>
   <div class="grid">
-    <section class="card c7"><div class="card-h"><h2>${L('School Cup standings','Classement de la Coupe')}</h2><span class="tiny">${L('Week of','Semaine du')} ${dateLabel(weekStart())}</span></div>${uniList(unis)}</section>
+    <section class="card c7"><div class="card-h"><h2>${L('School Cup standings','Classement de la Coupe')}</h2><span class="tiny">${L('Week of','Semaine du')} ${dateLabel(weekStart())}</span></div>${unis.length?uniList(unis):`<div class="empty"><b>${L('No school has played yet this week','Aucune école n’a encore joué cette semaine')}</b>${L('Be the first to score for yours.','Sois le premier à marquer pour la tienne.')}</div>`}</section>
     <section class="card pop c5"><div class="card-h"><h2>${L('Your contribution','Ta contribution')}</h2></div>
       ${s?`<div class="kpis" style="grid-template-columns:1fr 1fr"><div class="kpi"><small>${s.short} ${L('position','position')}</small><b>${mine?'#'+mine.pos:'–'}</b></div><div class="kpi"><small>${L('Your Cup points','Tes points')}</small><b>${fmt(st.schoolPts)}</b></div></div>
-      <p class="tiny">${st.stats.schoolRuns} ${plural(st.stats.schoolRuns,'School Cup run','School Cup runs','partie de Coupe','parties de Coupe')}. ${L('Points stay “pending” until enrollment is verified.','Les points restent « en attente » jusqu’à la vérification.')}</p>
+      <p class="tiny">${st.stats.schoolRuns} ${plural(st.stats.schoolRuns,'School Cup run','School Cup runs','partie de Coupe','parties de Coupe')}. ${LIVE?L('Your points count right away for your school.','Tes points comptent tout de suite pour ton école.'):L('Points stay “pending” until enrollment is verified.','Les points restent « en attente » jusqu’à la vérification.')}</p>
       <button class="btn hot" type="button" data-act="schoolRun">${L('Play a School Cup run','Jouer pour mon école')}</button>
       <button class="btn" type="button" data-act="classmate">${ic('swords',16)}${L('Challenge a classmate','Défier un camarade')}</button>`
-      :`<div class="empty"><b>${L('No school linked','Aucune école liée')}</b>${L('Pick your institution below.','Choisis ton établissement ci-dessous.')}</div>`}
+      :`<div class="empty"><b>${L('No school linked','Aucune école liée')}</b>${L('Pick or add your school below.','Choisis ou ajoute ton école ci-dessous.')}</div>`}
     </section>
-    <section class="card c6"><div class="card-h"><h2>${L('Your institution','Ton établissement')}</h2>${status}</div>${assoc}</section>
-    <section class="card c6"><div class="card-h"><h2>${L('Verification','Vérification')}</h2>${simPill(L('Proposed flow','Parcours proposé'))}</div>${verify}</section>
-    <section class="card c12"><div class="card-h"><h2>${L('Classes at','Classes de')} ${s?esc(s.name):L('your school','ton école')}</h2>${simPill()}</div>${s?classList(classRows().slice(0,6)):`<div class="empty"><b>${L('No class standings yet','Pas encore de classement')}</b></div>`}</section>
+    <section class="card c6"><div class="card-h"><h2>${L('Your school and year','Ton école et ton année')}</h2>${status}</div>${assoc}</section>
+    <section class="card c6"><div class="card-h"><h2>${LIVE?L('Verified badge','Badge vérifié'):L('Verification','Vérification')}</h2>${LIVE?`<span class="pill">${L('Optional','Facultatif')}</span>`:simPill(L('Proposed flow','Parcours proposé'))}</div>${verify}</section>
+    <section class="card c12"><div class="card-h"><h2>${L('Classes at','Promos de')} ${s?esc(s.name):L('your school','ton école')}</h2>${LIVE?'':simPill()}</div>${(()=>{const cr=s?classRows().slice(0,6):[];return cr.length?classList(cr):`<div class="empty"><b>${s?L('No class has played yet this week','Aucune promo n’a encore joué cette semaine'):L('No class standings yet','Pas encore de classement')}</b></div>`;})()}</section>
   </div>`;
 };
 
@@ -1611,8 +1653,8 @@ function renderLayer0(){
     body=`<div class="modal-h"><div><h2>${tt[0]}</h2><p>${tt[1]}</p></div>${closeBtn}</div>
       <div class="games four" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${PLAYABLE.map(g=>`<button class="gcard" type="button" style="--g:${g.col}" data-act="pick" data-a="${g.id}"><div class="gart">${ART[g.id]}</div><div class="gbody" style="padding:10px 12px"><h3 style="font-size:15px">${g.name}</h3><p class="tag">${g.dur}</p></div></button>`).join('')}</div>`;
   }else if(sh.type==='classmates'){
-    const st=S.data,mates=DEMO.filter(p=>SCH[st.school.id]&&p.school===st.school.id&&p.program===st.school.program),list=mates.length?mates:FRIENDS.map(id=>DEMO_BY[id]);
-    body=`<div class="modal-h"><div><h2>${L('Challenge a classmate','Défier un camarade')}</h2><p>${mates.length?esc(prog(st.school.program))+' · '+esc(SCH[st.school.id].short):L('No class linked, showing friends.','Aucune classe liée, voici tes amis.')} ${simPill(L('Simulated presence','Présence simulée'))}</p></div>${closeBtn}</div>
+    const st=S.data,mates=DEMO.filter(p=>SCH[st.school.id]&&p.school===st.school.id&&p.year===st.school.year),list=mates.length?mates:FRIENDS.map(id=>DEMO_BY[id]);
+    body=`<div class="modal-h"><div><h2>${L('Challenge a classmate','Défier un camarade')}</h2><p>${mates.length?esc(yearName(st.school.year))+' · '+esc(SCH[st.school.id].short):L('No class linked, showing friends.','Aucune promo liée, voici tes amis.')} ${simPill(L('Simulated presence','Présence simulée'))}</p></div>${closeBtn}</div>
       <ul class="hist">${list.map(p=>`<li>${avP(p,36)}<span class="t"><b class="row" style="gap:8px;flex-wrap:nowrap"><span class="presence${online(p)?' on':''}"></span>${esc(p.name)}</b><small>${p.rating} SR · ${online(p)?L('online','en ligne'):L('offline','hors ligne')}</small></span><button class="btn sm primary" type="button" data-act="challenge" data-a="${p.id}">${L('Pick','Choisir')}</button></li>`).join('')}</ul>`;
   }else if(sh.type==='more'){
     body=`<div class="modal-h"><h2>${L('More','Plus')}</h2>${closeBtn}</div>
@@ -1631,6 +1673,7 @@ function renderLayer0(){
     body=`<div class="modal-h"><div><h2>${m[0]}</h2><p>${m[1]}</p></div></div><div class="row"><button class="btn ${['reset','delete'].includes(sh.what)?'':'primary'}" type="button" data-act="confirmYes" style="${['reset','delete'].includes(sh.what)?'background:var(--bad);color:#fff':''}">${m[2]}</button><button class="btn ghost" type="button" data-act="close">${L('Cancel','Annuler')}</button></div>`;
   }else if(sh.type==='report')body=reportHTML(sh);
   else if(sh.type==='auth')body=authHTML(sh);
+  else if(sh.type==='campus')body=campusSheetHTML();
   Ly.innerHTML=`<div class="layer" data-act="scrim"><div class="modal" role="dialog" aria-modal="true">${body}</div></div>`;
   const f=Ly.querySelector('input:not([readonly]),.modal button.btn.primary');if(f&&Ly._fresh)setTimeout(()=>{const ae=document.activeElement;if(Ly.contains(f)&&!(ae&&ae!==f&&Ly.contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))try{f.focus();}catch(e){}},30);
 }
@@ -2365,6 +2408,17 @@ function finishGame(res){
 function checkAch(){const st=S.data,out=[];ACH.forEach(a=>{if(!st.ach.includes(a.id)&&a.t(st)){st.ach.push(a.id);out.push(a);}});return out;}
 
 /* ========================= actions ========================= */
+/* ---------- école et année ---------- */
+function campusRefresh(){if(S.ui.sheet&&S.ui.sheet.type==='campus')renderLayer();else render();}
+function newSchoolErr(){const c=S.ui.campus,n=(c.nn||'').trim(),ci=(c.nc||'').trim();
+  if(n.length<3||normTxt(n).length<2)return L('Enter the full name of your school (3 characters or more).','Écris le nom complet de ton école (3 caractères minimum).');
+  if(/https?:|www\.|@|<|>/i.test(n))return L('Only the name, no link or address.','Seulement le nom, sans lien ni adresse.');
+  if(ci.length<2||!/\p{L}/u.test(ci))return L('Enter the city of your campus.','Indique la ville de ton campus.');
+  return null;}
+function autoShort(name){const stop=['de','du','des','la','le','les','l','d','et','en','of','the','and','a','au','aux','for','at'];
+  let out='';name.split(/[^\p{L}\p{N}]+/u).filter(Boolean).forEach(w=>{const d=w.normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(stop.includes(d.toLowerCase()))return;out+=/^[A-Z0-9]{2,5}$/.test(w)?d.toUpperCase():d[0].toUpperCase();});
+  out=out.replace(/[^A-Z0-9]/g,'').slice(0,5);if(out.length<2)out=normTxt(name).slice(0,3).toUpperCase();
+  let s=out,i=1;while(SCHOOLS.some(x=>x.short===s)){s=out.slice(0,5-String(i).length)+i;i++;}return s;}
 const ACT={
   go:a=>go(a),
   lobby:a=>{if(S.ui.lobby.game!==a)Object.assign(S.ui.lobby,{mode:'trial'});go('lobby',a);},
@@ -2405,13 +2459,25 @@ const ACT={
   rankgo:a=>{const R=S.ui.rank;R.view='players';R.board=BOARD_IDS.includes(a)?a:'rating';R.scope='world';go('ranks');},
   rview:a=>{S.ui.rank.view=a;render();},
   rscope:a=>{const R=S.ui.rank;R.scope=a;R.loading=true;render();setTimeout(()=>{R.loading=false;if(S.route==='ranks')render();},260);},
-  campusEdit:()=>{Object.assign(S.ui.campus,{edit:true,q:'',pick:S.data.school.id||null,program:S.data.school.program,err:null});render();},
-  campusCancel:()=>{S.ui.campus.edit=false;S.ui.campus.err=null;render();},
-  campusPick:a=>{S.ui.campus.pick=a;S.ui.campus.err=null;const l=$('#schoolList');if(l)l.innerHTML=schoolListHTML(schoolFilter(S.ui.campus.q));},
-  campusSave:()=>{const c=S.ui.campus,st=S.data,pick=c.pick||(SCH[st.school.id]?st.school.id:null);if(!pick){c.err=L('Select an institution from the list first.','Choisis d’abord un établissement dans la liste.');render();return;}
-    const changed=pick!==st.school.id;st.school={id:pick,program:c.program||st.school.program,status:changed?'unverified':st.school.status,domain:changed?null:st.school.domain};if(changed)st.schoolPts=0;
-    c.edit=false;c.err=null;save();toast(L(`Linked to ${SCH[pick].name}.`,`Lié à ${SCH[pick].name}.`));render();},
-  campusRemove:()=>{const st=S.data;st.school={id:null,program:st.school.program,status:'unverified',domain:null};st.schoolPts=0;S.ui.campus.edit=false;save();toast(L('School unlinked.','École déliée.'));render();},
+  campusEdit:()=>{Object.assign(S.ui.campus,{edit:true,q:'',pick:S.data.school.id||null,year:S.data.school.year||null,err:null,adding:false});if(S.route!=='campus')go('campus');else render();},
+  campusCancel:()=>{Object.assign(S.ui.campus,{edit:false,err:null,adding:false});render();},
+  campusPick:a=>{const c=S.ui.campus;c.pick=a;c.err=null;c.q='';campusRefresh();},
+  campusAdd:()=>{const c=S.ui.campus;Object.assign(c,{adding:true,nn:(c.q||'').trim(),nc:'',nco:'',err:null});campusRefresh();setTimeout(()=>{const n=$('#nsCity');if(n)try{n.focus();}catch(e){}},40);},
+  campusAddCancel:()=>{Object.assign(S.ui.campus,{adding:false,err:null});campusRefresh();},
+  campusAddConfirm:()=>{const c=S.ui.campus,e=newSchoolErr();if(e){c.err=e;campusRefresh();return;}
+    const name=c.nn.trim().replace(/\s+/g,' '),city=c.nc.trim().replace(/\s+/g,' '),country=(c.nco||'France').trim()||'France';
+    let x=SCHOOLS.find(s=>normTxt(s.name)===normTxt(name)&&normTxt(s.city)===normTxt(city));
+    if(!x){x={id:'u'+Date.now().toString(36),name,short:autoShort(name),city,country:[country,country],domain:null,col:['#5B4BFF','#FF6B3D','#3D7BFF','#14B37A','#FF4FA0','#E0A100'][hashStr(name)%6],custom:true};
+      SCHOOLS.push(x);SCH[x.id]=x;(S.data.customSchools=S.data.customSchools||[]).push(x);save();}
+    Object.assign(c,{pick:x.id,adding:false,q:'',err:null});toast(L('School added. Now pick your year and save.','École ajoutée. Choisis ton année puis enregistre.'));campusRefresh();},
+  campusLater:()=>{S.ui.sheet=null;try{localStorage.setItem('ryvo.onb.'+(S.data.uid||'demo'),'1');}catch(e){}renderLayer();if(S.route==='campus')render();},
+  campusSave:()=>{const c=S.ui.campus,st=S.data,pick=c.pick||(SCH[st.school.id]?st.school.id:null);
+    if(c.adding){c.err=L('Finish adding your school first.','Termine d’abord l’ajout de ton école.');campusRefresh();return;}
+    if(!pick){c.err=L('Pick your school in the list, or add it.','Choisis ton école dans la liste, ou ajoute-la.');campusRefresh();return;}
+    if(!c.year){c.err=L('Choose your year of study.','Choisis ton année d’études.');campusRefresh();return;}
+    const changed=pick!==st.school.id;st.school={id:pick,program:st.school.program,year:c.year,status:changed?'unverified':st.school.status,domain:changed?null:st.school.domain};if(changed)st.schoolPts=0;
+    c.edit=false;c.err=null;save();if(S.ui.sheet&&S.ui.sheet.type==='campus'){S.ui.sheet=null;renderLayer();}toast(L(`Saved: ${SCH[pick].name}, ${yearName(c.year)}.`,`Enregistré : ${SCH[pick].name}, ${yearName(c.year)}.`));render();},
+  campusRemove:()=>{const st=S.data;st.school={id:null,program:st.school.program,year:st.school.year,status:'unverified',domain:null};st.schoolPts=0;S.ui.campus.edit=false;save();toast(L('You left this school.','Tu as quitté cette école.'));render();},
   verifyReset:()=>{S.data.school.status='unverified';S.data.school.domain=null;save();render();},
   avatar:a=>{S.data.account.avatar=+a;SFX.play('tap');save();render();},
   frame:a=>{S.data.account.frame=a;SFX.play('tap');save();render();},
@@ -2436,11 +2502,12 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('change',e=>{
   const k=e.target.dataset&&e.target.dataset.ch;if(!k)return;const v=e.target.value;
   if(k==='libMode'){S.ui.lib.mode=v;render();}if(k==='libDiff'){S.ui.lib.diff=v;render();}if(k==='libSort'){S.ui.lib.sort=v;render();}
-  if(k==='rboard'){S.ui.rank.board=v;render();}if(k==='campusProg'){S.ui.campus.program=v;}
+  if(k==='rboard'){S.ui.rank.board=v;render();}if(k==='campusYear'){S.ui.campus.year=v||null;S.ui.campus.err=null;}
 });
 document.addEventListener('input',e=>{
   const k=e.target.dataset&&e.target.dataset.in;if(!k)return;
-  if(k==='schoolQ'){S.ui.campus.q=e.target.value;$('#schoolList').innerHTML=schoolListHTML(schoolFilter(e.target.value));}
+  if(k==='schoolQ'){S.ui.campus.q=e.target.value;const l=$('#schoolList');if(l)l.innerHTML=schoolListHTML(schoolFilter(e.target.value));}
+  if(k==='campusNew'){S.ui.campus[e.target.dataset.k]=e.target.value;}
   if(k==='calc'){S.ui.calc[e.target.dataset.k]=e.target.value;$('#calcOut').innerHTML=calcOut();}
 });
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -2499,13 +2566,15 @@ const sb=LIVE?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSes
 async function rpc(fn,args){const {data,error}=await sb.rpc(fn,args||{});if(error)throw new Error(error.message||String(error));return data;}
 function errText(e){
   const m=String(e&&e.message||e||'');
+  if(/^school_locked:(\d+)/.test(m)){const d=new Date(+m.split(':')[1]);return L(`You changed school recently. You can switch again from ${d.toLocaleDateString(LOC())}.`,`Tu as changé d’école récemment. Tu pourras en changer à nouveau à partir du ${d.toLocaleDateString(LOC())}.`);}
   if(/^suspended:(\d+)/.test(m)){const d=new Date(+m.split(':')[1]);return L(`Your account is suspended until ${d.toLocaleDateString(LOC())}.`,`Ton compte est suspendu jusqu’au ${d.toLocaleDateString(LOC())}.`);}
   const T={not_authenticated:['Sign in to continue.','Connecte-toi pour continuer.'],banned:['This account is banned.','Ce compte est banni.'],game_unavailable:['This game is unavailable right now.','Ce jeu est indisponible pour le moment.'],
     daily_limit:['No Daily attempts left for this game today.','Plus d’essais du jour pour ce jeu.'],not_daily_game:['Today’s Daily changed. Reload the page.','Le Défi du jour a changé. Recharge la page.'],
     no_school:['Link a school in Campus first.','Lie d’abord une école dans Campus.'],rate_limited:['Too many actions in a short time. Try again in a few minutes.','Trop d’actions en peu de temps. Réessaie dans quelques minutes.'],
     username_taken:['That username is taken.','Ce pseudo est déjà pris.'],bad_username:['Use 3–16 letters, numbers, dots or underscores.','3 à 16 lettres, chiffres, points ou tirets bas.'],reserved_username:['That username is reserved.','Ce pseudo est réservé.'],
     locked_item:['Unlock this item by levelling up.','Débloque cet élément en montant de niveau.'],domain_mismatch:['That address isn’t from this school.','Cette adresse n’est pas celle de l’école.'],bad_email:['Enter a valid email address.','Saisis une adresse e-mail valide.'],
-    unknown_school:['Unknown school.','École inconnue.'],bad_target:['You can’t report this player.','Tu ne peux pas signaler ce joueur.'],expired:['This match took too long and expired.','Ce match a expiré.'],bad_run:['This match is already closed.','Ce match est déjà clos.'],
+    unknown_school:['Unknown school.','École inconnue.'],bad_school_name:['Enter the full name of your school, without links.','Écris le nom complet de ton école, sans lien.'],bad_city:['Enter the city of your campus.','Indique la ville de ton campus.'],
+    bad_country:['Check the country.','Vérifie le pays.'],bad_year:['Choose your year of study.','Choisis ton année d’études.'],no_domain:['This school has no email domain yet, so it can’t be verified for now.','Cette école n’a pas encore de domaine e-mail : la vérification n’est pas possible pour l’instant.'],bad_target:['You can’t report this player.','Tu ne peux pas signaler ce joueur.'],expired:['This match took too long and expired.','Ce match a expiré.'],bad_run:['This match is already closed.','Ce match est déjà clos.'],
     time_over:['Time’s up.','Temps écoulé.'],not_enough_questions:['Not enough questions yet. Try another game.','Pas encore assez de questions. Essaie un autre jeu.'],not_enough_words:['Not enough words yet. Try another game.','Pas encore assez de mots. Essaie un autre jeu.'],
     last_super_admin:['You are the last super admin: hand over the role before deleting your account.','Tu es le dernier super admin : transmets le rôle avant de supprimer ton compte.']};
   for(const k in T)if(m===k||m.startsWith(k))return L(T[k][0],T[k][1]);
@@ -2606,7 +2675,7 @@ function accountCardLive(){
   if(!NET.user)return `<section class="card c6"><div class="card-h"><h2>${L('Account','Compte')}</h2></div><p class="tiny">${L('Create an account to save your progress on every device.','Crée un compte pour retrouver ta progression sur tous tes appareils.')}</p><div class="row"><button class="btn primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button><button class="btn" type="button" data-act="auth" data-a="login">${L('Sign in','Connexion')}</button></div></section>`;
   return `<section class="card c6"><div class="card-h"><h2>${L('Account and data','Compte et données')}</h2></div>
     <form data-form="uname" class="row" novalidate style="align-items:flex-end"><div class="field" style="flex:1;min-width:160px"><label for="unInput">${L('Username','Pseudo')}</label><input class="input" id="unInput" name="user" maxlength="16" value="${esc(st.account.username)}"></div><button class="btn" type="submit">${L('Save','Enregistrer')}</button></form>
-    <dl class="cmp"><dt>E-mail</dt><dd>${esc(NET.user.email||'')}</dd><dt>${L('School','École')}</dt><dd>${SCH[st.school.id]?esc(SCH[st.school.id].short)+(st.school.status==='verified'?' ✓':''):L('None','Aucune')}</dd><dt>${L('Language','Langue')}</dt><dd>${LANG==='fr'?'Français':'English'}</dd></dl>
+    <dl class="cmp"><dt>E-mail</dt><dd>${esc(NET.user.email||'')}</dd><dt>${L('School','École')}</dt><dd>${SCH[st.school.id]?esc(SCH[st.school.id].short)+(st.school.status==='verified'?' ✓':'')+(st.school.year?' · '+esc(yearName(st.school.year)):''):L('None','Aucune')}</dd><dt>${L('Language','Langue')}</dt><dd>${LANG==='fr'?'Français':'English'}</dd></dl>
     <p class="tiny">${L('Your password is handled by the sign-in service and never seen by RYVO. You can download or delete your data at any time.','Ton mot de passe est géré par le service de connexion, RYVO ne le voit jamais. Tu peux télécharger ou supprimer tes données à tout moment.')}</p>
     <div class="row"><button class="btn sm" type="button" data-act="export">${L('Download my data','Télécharger mes données')}</button><button class="btn sm" type="button" data-act="signout">${L('Sign out','Se déconnecter')}</button><button class="btn sm ghost" type="button" data-act="reset" style="color:var(--bad)">${L('Delete my account','Supprimer mon compte')}</button></div></section>`;
 }
@@ -2633,7 +2702,7 @@ authHTML=function(sh){
     <div class="field"><label for="aPw">${L('Password','Mot de passe')}</label><input class="input" id="aPw" name="pw" type="password" autocomplete="new-password">${e.pw?`<span class="err">${e.pw}</span>`:`<span class="help">${L('At least 8 characters with a number.','Au moins 8 caractères dont un chiffre.')}</span>`}</div>
     <div class="field"><label for="aUser">${L('Username','Pseudo')}</label><input class="input" id="aUser" name="user" maxlength="16" autocomplete="nickname" value="${esc(v.user||'')}">${e.user?`<span class="err">${e.user}</span>`:`<span class="help">${L('3–16 letters, numbers, dot or underscore. Shown on leaderboards.','3 à 16 lettres, chiffres, point ou tiret bas. Affiché dans les classements.')}</span>`}</div>
     <div class="field"><span class="lab">Avatar</span><div class="choice">${AV_PRESETS.map((a,i)=>a.premium?'':`<button type="button" data-act="authAv" data-a="${i}" aria-pressed="${(sh.av??0)===i}">${face(a,34)}</button>`).join('')}</div></div>
-    <div class="field"><label for="aSchool">${L('School (optional)','École (optionnel)')}</label><select class="input" id="aSchool" name="school"><option value="">${L('Skip for now','Plus tard')}</option>${SCHOOLS.map(x=>`<option value="${x.id}" ${v.school===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <p class="tiny">${ic('campus',14)} ${L('You’ll add your school and your year right after, once signed in.','Tu indiqueras ton école et ton année juste après, une fois connecté.')}</p>
     <label class="tiny" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" name="age" ${v.age?'checked':''} style="margin-top:3px"> <span>${L('I am 15 or older, or I have my parents’ permission.','J’ai 15 ans ou plus, ou l’accord de mes parents.')}</span></label>${e.age?`<span class="err">${e.age}</span>`:''}
     ${err}<button class="btn primary" type="submit">${L('Create my account','Créer mon compte')}</button></form>`;
 };
@@ -2657,7 +2726,7 @@ function applyMe(m){
   if(st.uid!==m.id){const keep={lang:st.lang,sound:st.sound};S.data=Object.assign(DEF(),keep,{uid:m.id});}
   const d=S.data;NET.me=m;
   d.account.signedIn=true;d.account.username=m.username;d.account.avatar=m.avatar;d.account.frame=m.frame;d.account.skin=m.skin;
-  d.school={id:m.school_id,program:m.program||'bus2',status:m.verified?'verified':(m.verification&&m.verification.status==='pending'&&m.verification.school===m.school_id?'pending':'unverified'),domain:m.verification?m.verification.domain:null};
+  d.school={id:m.school_id,program:m.program||'bus2',year:m.study_year||null,status:m.verified?'verified':(m.verification&&m.verification.status==='pending'&&m.verification.school===m.school_id?'pending':'unverified'),domain:m.verification?m.verification.domain:null};
   d.xp=m.xp;d.rating=m.rating;d.streak=m.streak;
   d.bests={};Object.entries(m.bests||{}).forEach(([k,v])=>d.bests[k]=Number(v));
   d.history=(m.runs||[]).map(r=>({g:r.g,sk:r.sk,m:r.m,s:Number(r.s),o:r.o,opp:r.opp,xp:r.xp,dr:r.dr,t:r.t,x:r.x==null?undefined:Number(r.x),w:r.w,st:r.st}));
@@ -2669,14 +2738,27 @@ function applyMe(m){
 function applyInfo(info){
   NET.info=info;
   SCHOOLS.length=0;Object.keys(SCH).forEach(k=>delete SCH[k]);
-  (info.schools||[]).forEach(x=>{const s={id:x.id,name:x.name,short:x.short,city:x.city,country:[x.country,x.country],domain:x.domain,col:x.col};SCHOOLS.push(s);SCH[s.id]=s;});
+  (info.schools||[]).forEach(addSchoolLocal);
   const on=new Set((info.games||[]).filter(g=>g.on).map(g=>g.id));
   GAMES.forEach(g=>{if(g.id!=='party'){g.playable=on.has(g.id);if(!g.playable)g.eta=()=>L('Temporarily unavailable','Indisponible pour le moment');}});
   PLAYABLE.length=0;GAMES.filter(g=>g.playable).forEach(g=>PLAYABLE.push(g));
 }
-async function loadMe(){if(!NET.user)return;try{applyMe(await rpc('me'));}catch(e){toast(errText(e));}softRender();}
+function addSchoolLocal(x){const s={id:x.id,name:x.name,short:x.short,city:x.city,country:[x.country,x.country],domain:x.domain,col:x.col,members:Number(x.members)||0};
+  const i=SCHOOLS.findIndex(y=>y.id===s.id);if(i>=0)SCHOOLS[i]=s;else SCHOOLS.push(s);SCH[s.id]=s;return s;}
+async function loadMe(){if(!NET.user)return;try{applyMe(await rpc('me'));maybeOnboard();}catch(e){toast(errText(e));}softRender();}
+/* Juste après l'inscription (ou tant que ce n'est pas fait) : demander l'école et l'année, une fois par session, avec « Plus tard ». */
+function maybeOnboard(){
+  const m=NET.me;if(!m||NET.onb||(m.school_id&&m.study_year))return;
+  try{if(localStorage.getItem('ryvo.onb.'+m.id))return;}catch(e){}
+  /* pas pendant une partie ni sur l'écran de résultat (on laisse rejouer tout de suite après une connexion) */
+  if(S.ui.sheet||S.ui.notif||['game','result','campus'].includes(S.route))return;
+  NET.onb=true;Object.assign(S.ui.campus,{edit:true,q:'',pick:m.school_id||null,year:m.study_year||null,err:null,adding:false});
+  S.ui.sheet={type:'campus'};renderLayer();
+}
 async function loadInfo(){try{applyInfo(await rpc('public_info'));}catch(e){NET.infoErr=errText(e);}softRender();}
 function toGuest(){const keep={lang:S.data.lang,sound:S.data.sound};S.data=Object.assign(DEF(),keep);NET.me=null;save();}
+
+if(LIVE){const go0=go;go=function(r,a){go0(r,a);if(NET.me&&!NET.onb)setTimeout(maybeOnboard,250);};}
 
 /* ---------- partie : lancement, contexte, envoi ---------- */
 const startGameLocal=startGame,makeCtxLocal=makeCtx,finishGameLocal=finishGame;
@@ -2767,10 +2849,25 @@ if(LIVE){
     frame:a=>{A0.frame(a);upd({frame:a});},
     skin:a=>{A0.skin(a);upd({skin:a});},
     classmate:()=>{S.ui.sheet={type:'pick',purpose:'duel'};S.ui.notif=false;renderLayer();},
-    campusSave:()=>{const c=S.ui.campus,pick=c.pick||S.data.school.id;if(!pick){c.err=L('Select an institution from the list first.','Choisis d’abord un établissement dans la liste.');render();return;}
-      if(!NET.user){toast(L('Sign in to link a school.','Connecte-toi pour lier une école.'));ACT.auth('login');return;}
-      upd({school_id:pick,program:c.program||S.data.school.program},()=>{c.edit=false;c.err=null;invalidate();toast(L('School saved.','École enregistrée.'));render();});},
-    campusRemove:()=>upd({school_id:null},()=>{S.ui.campus.edit=false;invalidate();render();}),
+    campusSave:()=>{const c=S.ui.campus,pick=c.pick||S.data.school.id;
+      if(!NET.user){toast(L('Sign in to save your school.','Connecte-toi pour enregistrer ton école.'));ACT.auth('login');return;}
+      if(c.adding){c.err=L('Finish adding your school first.','Termine d’abord l’ajout de ton école.');campusRefresh();return;}
+      if(!pick){c.err=L('Pick your school in the list, or add it.','Choisis ton école dans la liste, ou ajoute-la.');campusRefresh();return;}
+      if(!c.year){c.err=L('Choose your year of study.','Choisis ton année d’études.');campusRefresh();return;}
+      if(c.busy)return;c.busy=true;
+      rpc('update_profile',{p:{school_id:pick,study_year:c.year}}).then(m=>{applyMe(m);c.edit=false;c.err=null;invalidate();loadInfo();
+        if(S.ui.sheet&&S.ui.sheet.type==='campus'){S.ui.sheet=null;renderLayer();}
+        toast(L(`Saved: ${SCH[pick]?SCH[pick].name:''}, ${yearName(c.year)}.`,`Enregistré : ${SCH[pick]?SCH[pick].name:''}, ${yearName(c.year)}.`));softRender();})
+      .catch(e=>{c.err=errText(e);campusRefresh();}).finally(()=>{c.busy=false;});},
+    campusAddConfirm:async()=>{const c=S.ui.campus,e=newSchoolErr();if(e){c.err=e;campusRefresh();return;}
+      if(!NET.user){toast(L('Sign in to add your school.','Connecte-toi pour ajouter ton école.'));ACT.auth('login');return;}
+      if(c.busy)return;c.busy=true;
+      try{const x=await rpc('add_school',{p_name:c.nn.trim(),p_city:c.nc.trim(),p_country:(c.nco||'France').trim()||'France'});const sc=addSchoolLocal(x);
+        Object.assign(c,{pick:sc.id,adding:false,q:'',err:null});
+        toast(x.existed?L('This school was already there: it’s now selected.','Cette école existait déjà : elle est sélectionnée.'):L('School added: everyone can now pick it. Choose your year and save.','École ajoutée : tout le monde peut la choisir. Choisis ton année et enregistre.'));}
+      catch(err){c.err=errText(err);}
+      finally{c.busy=false;campusRefresh();}},
+    campusRemove:()=>upd({school_id:null},()=>{S.ui.campus.edit=false;invalidate();loadInfo();render();}),
     verifyReset:()=>{S.data.school.status='unverified';render();},
     signout:async()=>{await sb.auth.signOut();toast(L('Signed out.','Déconnecté.'));},
     export:async()=>{try{const d=await rpc('export_my_data');S.ui.sheet={type:'export',text:JSON.stringify(d,null,2)};renderLayer();}catch(e){toast(errText(e));}},
@@ -2795,14 +2892,14 @@ if(LIVE)document.addEventListener('submit',async e=>{
   const fail=(err,vals)=>{S.ui.sheet=Object.assign(sh||{type:'auth'},{err,vals});renderLayer();};
   const redirect=location.origin+location.pathname;
   if(k==='signup'){
-    const email=F('email'),pw=f.elements.pw.value,user=F('user'),school=F('school'),age=f.elements.age.checked,err={};
+    const email=F('email'),pw=f.elements.pw.value,user=F('user'),school='',age=f.elements.age.checked,err={};
     if(!EMAIL_RE2.test(email))err.email=L('Enter a valid email address.','Saisis une adresse e-mail valide.');
     if(pw.length<8||!/\d/.test(pw))err.pw=L('Use at least 8 characters, including a number.','Au moins 8 caractères, dont un chiffre.');
     if(!/^[A-Za-z0-9._]{3,16}$/.test(user))err.user=L('Use 3–16 letters, numbers, dots or underscores.','3 à 16 lettres, chiffres, points ou tirets bas.');
     if(!age)err.age=L('Please confirm this to continue.','Merci de confirmer pour continuer.');
     if(Object.keys(err).length)return fail(err,{email,user,school,age});
     busy(true);
-    const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:{username:user,avatar:sh&&sh.av!=null?sh.av:0,school:school||null,lang:LANG},emailRedirectTo:redirect}});
+    const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:{username:user,avatar:sh&&sh.av!=null?sh.av:0,lang:LANG},emailRedirectTo:redirect}});
     if(error){busy(false);return fail({form:/registered|exists/i.test(error.message)?L('An account already exists with this email. Sign in instead.','Un compte existe déjà avec cet e-mail. Connecte-toi.'):/password/i.test(error.message)?L('This password is too weak. Pick a longer one.','Ce mot de passe est trop faible. Choisis-en un plus long.'):errText(error)},{email,user,school,age});}
     if(data.session){S.ui.sheet=null;renderLayer();toast(L('Account created.','Compte créé.'));}
     else{S.ui.sheet={type:'auth',tab:'sent',email};renderLayer();}

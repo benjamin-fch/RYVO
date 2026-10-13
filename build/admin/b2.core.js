@@ -60,6 +60,7 @@ const SCH0=[
 const SCH_STATUS={paid:['Partenaire payant','good'],free:['Partenaire gratuit','brand'],none:['Non partenaire','']};
 const PROGRAMS={bus1:'Commerce · 1re année',bus2:'Commerce · 2e année',eng1:'Ingénierie · 1re année',eng2:'Ingénierie · 2e année',log1:'Logistique · Master 1',des3:'Design · 3e année',cs2:'Informatique · 2e année',law1:'Droit · 1re année'};
 const PROG_IDS=Object.keys(PROGRAMS);
+const YEARS={'1':'1re année (Bac+1)','2':'2e année (Bac+2)','3':'3e année (Bac+3)','4':'4e année (Bac+4)','5':'5e année (Bac+5)','6':'6e année et plus'};
 const GAMES0=[
   {id:'sprint',name:'Neon Sprint',col:'#3D7BFF'},{id:'reflex',name:'Reflex Arena',col:'#FF6B3D'},{id:'brain',name:'Brain Battle',col:'#8B5CF6'},{id:'cards',name:'Card Clash',col:'#FFB800'},
   {id:'stack',name:'Skyline Stack',col:'#FF4FA0'},{id:'grid',name:'Grid Lock',col:'#14B37A'},{id:'words',name:'Word Rush',col:'#00A6C8'},{id:'aim',name:'Pop Shot',col:'#F23F55'},{id:'party',name:'Pulse Party',col:'#B5B0C7',dev:true}

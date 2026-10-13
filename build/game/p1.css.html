@@ -480,6 +480,11 @@ button.ccard[disabled]{opacity:.5;cursor:default}
 .schools li{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;cursor:pointer;border:2px solid transparent}
 .schools li:hover{background:var(--wash)}
 .schools li[aria-selected="true"]{border-color:var(--ink);background:var(--brand-soft)}
+.schools:empty{display:none}
+.schools li.addrow{border:2px dashed var(--line)}
+.schools li.addrow:hover{border-color:var(--ink)}
+.addbox{border:2px solid var(--line);border-radius:16px;padding:14px;background:var(--wash)}
+.opp.picked{border-color:var(--ink)}
 .crest{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font:800 11px/1 var(--f-d);color:#fff;flex:none;border:2px solid var(--ink)}
 .chart text{fill:var(--ink2);font:600 10px var(--f-m)}
 .chart .gl line{stroke:var(--line);stroke-width:1}

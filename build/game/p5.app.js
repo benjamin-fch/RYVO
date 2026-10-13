@@ -93,6 +93,17 @@ function finishGame(res){
 function checkAch(){const st=S.data,out=[];ACH.forEach(a=>{if(!st.ach.includes(a.id)&&a.t(st)){st.ach.push(a.id);out.push(a);}});return out;}
 
 /* ========================= actions ========================= */
+/* ---------- école et année ---------- */
+function campusRefresh(){if(S.ui.sheet&&S.ui.sheet.type==='campus')renderLayer();else render();}
+function newSchoolErr(){const c=S.ui.campus,n=(c.nn||'').trim(),ci=(c.nc||'').trim();
+  if(n.length<3||normTxt(n).length<2)return L('Enter the full name of your school (3 characters or more).','Écris le nom complet de ton école (3 caractères minimum).');
+  if(/https?:|www\.|@|<|>/i.test(n))return L('Only the name, no link or address.','Seulement le nom, sans lien ni adresse.');
+  if(ci.length<2||!/\p{L}/u.test(ci))return L('Enter the city of your campus.','Indique la ville de ton campus.');
+  return null;}
+function autoShort(name){const stop=['de','du','des','la','le','les','l','d','et','en','of','the','and','a','au','aux','for','at'];
+  let out='';name.split(/[^\p{L}\p{N}]+/u).filter(Boolean).forEach(w=>{const d=w.normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(stop.includes(d.toLowerCase()))return;out+=/^[A-Z0-9]{2,5}$/.test(w)?d.toUpperCase():d[0].toUpperCase();});
+  out=out.replace(/[^A-Z0-9]/g,'').slice(0,5);if(out.length<2)out=normTxt(name).slice(0,3).toUpperCase();
+  let s=out,i=1;while(SCHOOLS.some(x=>x.short===s)){s=out.slice(0,5-String(i).length)+i;i++;}return s;}
 const ACT={
   go:a=>go(a),
   lobby:a=>{if(S.ui.lobby.game!==a)Object.assign(S.ui.lobby,{mode:'trial'});go('lobby',a);},
@@ -133,13 +144,25 @@ const ACT={
   rankgo:a=>{const R=S.ui.rank;R.view='players';R.board=BOARD_IDS.includes(a)?a:'rating';R.scope='world';go('ranks');},
   rview:a=>{S.ui.rank.view=a;render();},
   rscope:a=>{const R=S.ui.rank;R.scope=a;R.loading=true;render();setTimeout(()=>{R.loading=false;if(S.route==='ranks')render();},260);},
-  campusEdit:()=>{Object.assign(S.ui.campus,{edit:true,q:'',pick:S.data.school.id||null,program:S.data.school.program,err:null});render();},
-  campusCancel:()=>{S.ui.campus.edit=false;S.ui.campus.err=null;render();},
-  campusPick:a=>{S.ui.campus.pick=a;S.ui.campus.err=null;const l=$('#schoolList');if(l)l.innerHTML=schoolListHTML(schoolFilter(S.ui.campus.q));},
-  campusSave:()=>{const c=S.ui.campus,st=S.data,pick=c.pick||(SCH[st.school.id]?st.school.id:null);if(!pick){c.err=L('Select an institution from the list first.','Choisis d’abord un établissement dans la liste.');render();return;}
-    const changed=pick!==st.school.id;st.school={id:pick,program:c.program||st.school.program,status:changed?'unverified':st.school.status,domain:changed?null:st.school.domain};if(changed)st.schoolPts=0;
-    c.edit=false;c.err=null;save();toast(L(`Linked to ${SCH[pick].name}.`,`Lié à ${SCH[pick].name}.`));render();},
-  campusRemove:()=>{const st=S.data;st.school={id:null,program:st.school.program,status:'unverified',domain:null};st.schoolPts=0;S.ui.campus.edit=false;save();toast(L('School unlinked.','École déliée.'));render();},
+  campusEdit:()=>{Object.assign(S.ui.campus,{edit:true,q:'',pick:S.data.school.id||null,year:S.data.school.year||null,err:null,adding:false});if(S.route!=='campus')go('campus');else render();},
+  campusCancel:()=>{Object.assign(S.ui.campus,{edit:false,err:null,adding:false});render();},
+  campusPick:a=>{const c=S.ui.campus;c.pick=a;c.err=null;c.q='';campusRefresh();},
+  campusAdd:()=>{const c=S.ui.campus;Object.assign(c,{adding:true,nn:(c.q||'').trim(),nc:'',nco:'',err:null});campusRefresh();setTimeout(()=>{const n=$('#nsCity');if(n)try{n.focus();}catch(e){}},40);},
+  campusAddCancel:()=>{Object.assign(S.ui.campus,{adding:false,err:null});campusRefresh();},
+  campusAddConfirm:()=>{const c=S.ui.campus,e=newSchoolErr();if(e){c.err=e;campusRefresh();return;}
+    const name=c.nn.trim().replace(/\s+/g,' '),city=c.nc.trim().replace(/\s+/g,' '),country=(c.nco||'France').trim()||'France';
+    let x=SCHOOLS.find(s=>normTxt(s.name)===normTxt(name)&&normTxt(s.city)===normTxt(city));
+    if(!x){x={id:'u'+Date.now().toString(36),name,short:autoShort(name),city,country:[country,country],domain:null,col:['#5B4BFF','#FF6B3D','#3D7BFF','#14B37A','#FF4FA0','#E0A100'][hashStr(name)%6],custom:true};
+      SCHOOLS.push(x);SCH[x.id]=x;(S.data.customSchools=S.data.customSchools||[]).push(x);save();}
+    Object.assign(c,{pick:x.id,adding:false,q:'',err:null});toast(L('School added. Now pick your year and save.','École ajoutée. Choisis ton année puis enregistre.'));campusRefresh();},
+  campusLater:()=>{S.ui.sheet=null;try{localStorage.setItem('ryvo.onb.'+(S.data.uid||'demo'),'1');}catch(e){}renderLayer();if(S.route==='campus')render();},
+  campusSave:()=>{const c=S.ui.campus,st=S.data,pick=c.pick||(SCH[st.school.id]?st.school.id:null);
+    if(c.adding){c.err=L('Finish adding your school first.','Termine d’abord l’ajout de ton école.');campusRefresh();return;}
+    if(!pick){c.err=L('Pick your school in the list, or add it.','Choisis ton école dans la liste, ou ajoute-la.');campusRefresh();return;}
+    if(!c.year){c.err=L('Choose your year of study.','Choisis ton année d’études.');campusRefresh();return;}
+    const changed=pick!==st.school.id;st.school={id:pick,program:st.school.program,year:c.year,status:changed?'unverified':st.school.status,domain:changed?null:st.school.domain};if(changed)st.schoolPts=0;
+    c.edit=false;c.err=null;save();if(S.ui.sheet&&S.ui.sheet.type==='campus'){S.ui.sheet=null;renderLayer();}toast(L(`Saved: ${SCH[pick].name}, ${yearName(c.year)}.`,`Enregistré : ${SCH[pick].name}, ${yearName(c.year)}.`));render();},
+  campusRemove:()=>{const st=S.data;st.school={id:null,program:st.school.program,year:st.school.year,status:'unverified',domain:null};st.schoolPts=0;S.ui.campus.edit=false;save();toast(L('You left this school.','Tu as quitté cette école.'));render();},
   verifyReset:()=>{S.data.school.status='unverified';S.data.school.domain=null;save();render();},
   avatar:a=>{S.data.account.avatar=+a;SFX.play('tap');save();render();},
   frame:a=>{S.data.account.frame=a;SFX.play('tap');save();render();},
@@ -164,11 +187,12 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('change',e=>{
   const k=e.target.dataset&&e.target.dataset.ch;if(!k)return;const v=e.target.value;
   if(k==='libMode'){S.ui.lib.mode=v;render();}if(k==='libDiff'){S.ui.lib.diff=v;render();}if(k==='libSort'){S.ui.lib.sort=v;render();}
-  if(k==='rboard'){S.ui.rank.board=v;render();}if(k==='campusProg'){S.ui.campus.program=v;}
+  if(k==='rboard'){S.ui.rank.board=v;render();}if(k==='campusYear'){S.ui.campus.year=v||null;S.ui.campus.err=null;}
 });
 document.addEventListener('input',e=>{
   const k=e.target.dataset&&e.target.dataset.in;if(!k)return;
-  if(k==='schoolQ'){S.ui.campus.q=e.target.value;$('#schoolList').innerHTML=schoolListHTML(schoolFilter(e.target.value));}
+  if(k==='schoolQ'){S.ui.campus.q=e.target.value;const l=$('#schoolList');if(l)l.innerHTML=schoolListHTML(schoolFilter(e.target.value));}
+  if(k==='campusNew'){S.ui.campus[e.target.dataset.k]=e.target.value;}
   if(k==='calc'){S.ui.calc[e.target.dataset.k]=e.target.value;$('#calcOut').innerHTML=calcOut();}
 });
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;

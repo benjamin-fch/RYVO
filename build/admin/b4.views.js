@@ -90,7 +90,7 @@ function playerDrawer(){
   <dl class="kv">
     <dt>Identifiant</dt><dd>${esc(String(p.id).slice(0,8))}…</dd>
     <dt>E-mail</dt><dd>${esc(rev||p.mail||'')} ${rev?'':`<button class="btn sm ghost" type="button" data-act="reveal" data-a="${p.id}">${ic('eye',14)}Afficher</button>`}</dd>
-    <dt>École</dt><dd>${s?esc(s.name):'—'}</dd><dt>Programme</dt><dd>${esc(PROGRAMS[p.program]||'—')}</dd>
+    <dt>École</dt><dd>${s?esc(s.name):'—'}</dd><dt>Année</dt><dd>${esc(YEARS[p.year]||'—')}</dd>
     <dt>Inscrit le</dt><dd>${dLong(p.joined)}</dd><dt>Dernière activité</dt><dd>${ago(p.last)}</dd>
     <dt>Niveau · cote</dt><dd>${p.level} · ${fmt(p.rating)} SR</dd><dt>Parties</dt><dd>${fmt(p.matches)}</dd>
   </dl>
@@ -263,10 +263,11 @@ V.schools=()=>{
       <div class="field"><label for="mgSch">École</label><select class="input" id="mgSch" name="school">${d.schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
       <div class="field"><label for="mgRole">Fonction</label><input class="input" id="mgRole" name="role" maxlength="40" placeholder="ex. Président du BDE"></div>
       <button class="btn primary" type="submit" ${d.schools.length?'':'disabled'}>Ajouter</button><p class="tiny">Fiche de contact pour l’équipe. L’accès des écoles à un tableau de bord viendra plus tard.</p></form></section></div>`;
-  return top+`<div class="row" style="justify-content:flex-end;margin-bottom:12px"><button class="btn primary" type="button" data-act="schoolEdit" data-a="">${ic('plus',15)}Ajouter un établissement</button></div>
+  const np=d.schools.filter(s=>s.by_player).length;
+  return top+`<div class="row" style="justify-content:space-between;margin-bottom:12px"><p class="tiny" style="max-width:62ch">Les joueurs ajoutent eux-mêmes leur école depuis Campus (nom, ville, pays ; doublons évités automatiquement). ${np?`<b>${np} ajoutée${np>1?'s':''} par des joueurs.</b> `:''}Renomme, fusionne les doublons ou supprime les faux établissements. Le domaine e-mail est facultatif : il sert seulement au badge « vérifié ».</p><button class="btn primary" type="button" data-act="schoolEdit" data-a="">${ic('plus',15)}Ajouter un établissement</button></div>
   ${d.schools.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Établissement</th><th>Ville</th><th>Domaine e-mail</th><th>Statut</th><th class="num">Joueurs</th><th class="num">Vérifiés</th><th></th></tr></thead><tbody>
-  ${d.schools.map(s=>{const st=SCH_STATUS[s.status]||SCH_STATUS.none;return `<tr><td><span class="row" style="flex-wrap:nowrap"><span class="pav" style="background:${s.col};font-size:9px;width:34px">${esc(s.short)}</span><b>${esc(s.name)}</b></span></td><td>${esc(s.city)}, ${esc(s.country)}</td><td class="mono">@${esc(s.domain)}</td><td><span class="badge ${st[1]}">${st[0]}</span></td><td class="num">${s.players}</td><td class="num">${s.verified}</td><td class="act"><button class="btn sm ghost" type="button" data-act="schoolEdit" data-a="${s.id}" aria-label="Modifier">${ic('edit',15)}</button></td></tr>`;}).join('')}
-  </tbody></table></div>`:'<div class="empty"><b>Aucun établissement</b>Ajoute les écoles partenaires : elles apparaîtront dans le jeu (Campus, inscription).</div>'}`;
+  ${d.schools.map(s=>{const st=SCH_STATUS[s.status]||SCH_STATUS.none;return `<tr><td><span class="row" style="flex-wrap:nowrap"><span class="pav" style="background:${s.col};font-size:9px;width:34px">${esc(s.short)}</span><span style="min-width:0"><b>${esc(s.name)}</b>${s.by_player?`<span class="sub">Ajoutée par ${esc(s.creator||'un joueur supprimé')} · ${ago(s.t)}</span>`:''}</span></span></td><td>${esc(s.city)}, ${esc(s.country)}</td><td class="mono">${s.domain?'@'+esc(s.domain):'<span class="sub">—</span>'}</td><td><span class="badge ${st[1]}">${st[0]}</span></td><td class="num">${s.players}</td><td class="num">${s.verified}</td><td class="act"><button class="btn sm ghost" type="button" data-act="schoolEdit" data-a="${s.id}" aria-label="Modifier">${ic('edit',15)}</button>${d.schools.length>1?`<button class="btn sm ghost" type="button" data-act="askSchoolMerge" data-a="${s.id}">Fusionner</button>`:''}<button class="btn sm ghost" type="button" data-act="askSchoolDel" data-a="${s.id}" style="color:var(--bad)">Supprimer</button></td></tr>`;}).join('')}
+  </tbody></table></div>`:'<div class="empty"><b>Aucun établissement</b>Les joueurs ajoutent leur école depuis Campus. Tu peux aussi en créer ici.</div>'}`;
 };
 function schoolForm(id){
   const s=(id&&S.d.schools?S.d.schools.schools.find(x=>x.id===id):null)||{name:'',short:'',city:'',country:'France',domain:'',status:'none',col:'#5B4BFF'},e=S.ui.layer.err,v=Object.assign({},s,S.ui.layer.vals||{});
@@ -275,7 +276,7 @@ function schoolForm(id){
   <form data-form="school" data-id="${id||''}" class="stack" novalidate><div class="fgrid">
     <div class="field full"><label for="sfName">Nom complet</label><input class="input" id="sfName" name="name" value="${esc(v.name)}" maxlength="80"></div>
     <div class="field"><label for="sfShort">Sigle</label><input class="input" id="sfShort" name="short" value="${esc(v.short)}" maxlength="5"></div>
-    <div class="field"><label for="sfDom">Domaine e-mail</label><input class="input mono" id="sfDom" name="domain" value="${esc(v.domain)}" placeholder="ecole.fr"><span class="help">Sans le @. Les étudiants doivent utiliser ce domaine pour demander leur badge.</span></div>
+    <div class="field"><label for="sfDom">Domaine e-mail (facultatif)</label><input class="input mono" id="sfDom" name="domain" value="${esc(v.domain||'')}" placeholder="ecole.fr"><span class="help">Sans le @. Active le badge « vérifié » : les étudiants demandent le badge avec une adresse de ce domaine.</span></div>
     <div class="field"><label for="sfCity">Ville</label><input class="input" id="sfCity" name="city" value="${esc(v.city)}" maxlength="40"></div>
     <div class="field"><label for="sfCountry">Pays</label><input class="input" id="sfCountry" name="country" value="${esc(v.country)}" maxlength="40"></div>
     <div class="field"><label for="sfSt">Statut</label><select class="input" id="sfSt" name="status">${Object.entries(SCH_STATUS).map(([k,l])=>`<option value="${k}" ${v.status===k?'selected':''}>${l[0]}</option>`).join('')}</select></div>
@@ -352,6 +353,7 @@ V.team=()=>{
 function confirmHTML(c){
   return `<div class="m-h"><div><h2>${esc(c.title)}</h2><p>${esc(c.body)}</p></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
   ${c.reason?`<div class="field"><label for="cfReason">Motif (obligatoire)</label><select class="input" id="cfReason">${MOTIFS.map(m=>`<option>${m}</option>`).join('')}</select></div><div class="field"><label for="cfNote">Précisions</label><textarea class="input" id="cfNote" placeholder="Ce que l’équipe doit savoir"></textarea></div>`:''}
+  ${c.kind==='schoolMerge'?`<div class="field"><label for="cfInto">École à garder</label><select class="input" id="cfInto">${(S.d.schools?S.d.schools.schools:[]).filter(s=>s.id!==c.sid).map(s=>`<option value="${s.id}">${esc(s.name)} · ${esc(s.city)} (${esc(s.short)}, ${s.players} joueur${s.players>1?'s':''})</option>`).join('')}</select></div>`:''}
   ${c.word?`<div class="field"><label for="cfType">Tape <b>${esc(c.word)}</b> pour confirmer</label><input class="input mono" id="cfType" autocomplete="off"></div><p class="tiny" id="cfErr" style="color:var(--bad);font-weight:600"></p>`:''}
   <div class="row"><button class="btn ${c.danger?'danger':'primary'}" type="button" data-act="confirmYes">${esc(c.ok)}</button><button class="btn ghost" type="button" data-act="close">Annuler</button></div>`;
 }

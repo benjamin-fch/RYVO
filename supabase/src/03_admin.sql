@@ -74,7 +74,7 @@ end $$;
 -- ---------- joueurs ----------
 create or replace function public.admin_player_row(p profiles) returns jsonb
 language sql stable security definer set search_path = public as $$
-  select jsonb_build_object('id', p.id, 'name', p.username, 'school', p.school_id, 'program', p.program, 'level', level_of(p.xp), 'xp', p.xp, 'rating', p.rating,
+  select jsonb_build_object('id', p.id, 'name', p.username, 'school', p.school_id, 'program', p.program, 'year', p.study_year, 'level', level_of(p.xp), 'xp', p.xp, 'rating', p.rating,
     'matches', (select count(*) from runs r where r.user_id = p.id and r.submitted_at is not null),
     'joined', ms(p.created_at), 'last', ms(p.last_seen), 'status', p.status, 'until', ms(p.suspended_until), 'verified', p.verified, 'plus', p.plus,
     'mail', mask_email((select email from auth.users u where u.id = p.id)),
@@ -458,6 +458,7 @@ begin
   perform admin_require('partner');
   return jsonb_build_object(
     'schools', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'name', s.name, 'short', s.short, 'city', s.city, 'country', s.country, 'domain', s.domain, 'col', s.col, 'status', s.status,
+        'by_player', s.created_by is not null, 'creator', (select username from profiles where id = s.created_by), 't', ms(s.created_at),
         'players', (select count(*) from profiles p where p.school_id = s.id), 'verified', (select count(*) from profiles p where p.school_id = s.id and p.verified)) order by s.name), '[]') from schools s),
     'verifs', (select coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'player', jsonb_build_object('id', p.id, 'name', p.username), 'school', v.school_id,
         'local', left(split_part(v.email,'@',1),1) || '***', 'domain', split_part(v.email,'@',2), 'match', split_part(v.email,'@',2) = s.domain, 'method', v.method, 't', ms(v.created_at)) order by v.created_at), '[]')
@@ -467,14 +468,14 @@ end $$;
 
 create or replace function public.admin_save_school(p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v_id text := nullif(p->>'id',''); v_short text := upper(trim(p->>'short')); v_dom text := lower(regexp_replace(trim(p->>'domain'), '^@', ''));
+declare v_id text := nullif(p->>'id',''); v_short text := upper(trim(p->>'short')); v_dom text := nullif(lower(regexp_replace(trim(coalesce(p->>'domain','')), '^@', '')), '');
 begin
   perform admin_require('partner');
   if length(trim(coalesce(p->>'name',''))) < 3 then raise exception 'name_too_short'; end if;
   if v_short !~ '^[A-Z0-9]{2,5}$' then raise exception 'bad_short'; end if;
-  if v_dom !~ '^[a-z0-9-]+(\.[a-z0-9-]+)+$' then raise exception 'bad_domain'; end if;
+  if v_dom is not null and v_dom !~ '^[a-z0-9-]+(\.[a-z0-9-]+)+$' then raise exception 'bad_domain'; end if;
   if exists(select 1 from schools where short = v_short and id is distinct from v_id) then raise exception 'short_taken'; end if;
-  if exists(select 1 from schools where domain = v_dom and id is distinct from v_id) then raise exception 'domain_taken'; end if;
+  if v_dom is not null and exists(select 1 from schools where domain = v_dom and id is distinct from v_id) then raise exception 'domain_taken'; end if;
   if coalesce(trim(p->>'city'),'') = '' then raise exception 'city_required'; end if;
   if v_id is null then
     insert into schools(name, short, city, country, domain, col, status) values (trim(p->>'name'), v_short, trim(p->>'city'), coalesce(nullif(trim(p->>'country'),''),'France'), v_dom, coalesce(p->>'col','#5B4BFF'), coalesce(p->>'status','none'));
@@ -486,6 +487,37 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
+-- fusionner un doublon (ex. « EM Normandie » ajoutée deux fois) : joueurs, demandes et compétitions passent sur l'école gardée
+create or replace function public.admin_merge_school(p_from text, p_into text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_f schools; v_t schools; v_n int;
+begin
+  perform admin_require('partner');
+  select * into v_f from schools where id = p_from; select * into v_t from schools where id = p_into;
+  if v_f.id is null or v_t.id is null or v_f.id = v_t.id then raise exception 'bad_target'; end if;
+  update profiles set school_id = v_t.id where school_id = v_f.id; get diagnostics v_n = row_count;
+  update verifications set school_id = v_t.id where school_id = v_f.id;
+  update competitions set school_id = v_t.id where school_id = v_f.id;
+  update campus_managers set school_id = v_t.id where school_id = v_f.id;
+  delete from schools where id = v_f.id;
+  perform audit('a fusionné l’établissement', v_f.name || ' (' || v_f.short || ') → ' || v_t.name || ' (' || v_t.short || ')', v_n || ' joueur(s)');
+  return jsonb_build_object('ok', true, 'moved', v_n);
+end $$;
+
+-- supprimer un établissement (nom inapproprié, faux établissement) : ses joueurs n'ont plus d'école
+create or replace function public.admin_delete_school(p_id text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_s schools; v_n int;
+begin
+  perform admin_require('partner');
+  select * into v_s from schools where id = p_id; if v_s.id is null then raise exception 'not_found'; end if;
+  select count(*) into v_n from profiles where school_id = v_s.id;
+  update profiles set school_id = null, verified = false, school_set_at = null where school_id = v_s.id;
+  delete from schools where id = v_s.id;
+  perform audit('a supprimé l’établissement', v_s.name, v_n || ' joueur(s) détaché(s)');
+  return jsonb_build_object('ok', true, 'detached', v_n);
+end $$;
+
 create or replace function public.admin_verif_action(p_id uuid, p_action text) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare v_v verifications; v_s schools; v_p profiles;
@@ -494,7 +526,7 @@ begin
   select * into v_v from verifications where id = p_id and status = 'pending'; if v_v.id is null then raise exception 'not_pending'; end if;
   select * into v_s from schools where id = v_v.school_id; select * into v_p from profiles where id = v_v.user_id;
   if p_action = 'ok' then
-    if split_part(v_v.email,'@',2) <> v_s.domain then raise exception 'domain_mismatch'; end if;
+    if v_s.domain is null or split_part(v_v.email,'@',2) <> v_s.domain then raise exception 'domain_mismatch'; end if;
     update verifications set status = 'approved', decided_at = now() where id = p_id;
     update profiles set verified = true, school_id = v_v.school_id where id = v_v.user_id;
     perform audit('a vérifié l’étudiant', v_p.username, v_s.short);

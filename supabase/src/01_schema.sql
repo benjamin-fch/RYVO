@@ -44,6 +44,17 @@ create table if not exists public.profiles(
 );
 create unique index if not exists profiles_username_lower on public.profiles (lower(username));
 
+-- évolutions d'une base existante (sans perte de données)
+-- les joueurs ajoutent eux-mêmes leur école : le domaine e-mail devient facultatif
+alter table public.schools alter column domain drop not null;
+alter table public.schools add column if not exists created_by uuid references auth.users(id) on delete set null;
+-- année d'études déclarée par le joueur (1 = 1re année / Bac+1 … 6 = Bac+6 et plus)
+alter table public.profiles add column if not exists study_year text;
+alter table public.profiles add column if not exists school_set_at timestamptz;
+do $$ begin
+  alter table public.profiles add constraint profiles_study_year_check check (study_year in ('1','2','3','4','5','6'));
+exception when duplicate_object then null; end $$;
+
 create table if not exists public.admins(
   user_id uuid primary key references auth.users(id) on delete cascade,
   role text not null check (role in ('super','mod','content','partner')),
@@ -238,6 +249,11 @@ on conflict (id) do nothing;
 
 -- ---------- petits utilitaires ----------
 create or replace function public.ms(t timestamptz) returns bigint language sql immutable as $$ select (extract(epoch from t)*1000)::bigint $$;
+-- comparaison de noms d'écoles sans accents, majuscules ni ponctuation (« École Polytechnique » = « ecole polytechnique »)
+create or replace function public.deaccent(t text) returns text language sql immutable as $$
+  select translate(lower(coalesce(t,'')), 'àáâãäåāçćčèéêëēėęîïíīįìłñńôöòóœøōõßśšûüùúūÿýžźż',
+    'aaaaaaa' || 'ccc' || 'eeeeeee' || 'iiiiii' || 'l' || 'nn' || 'oooooooo' || 's' || 'ss' || 'uuuuu' || 'yy' || 'zzz') $$;
+create or replace function public.school_norm(t text) returns text language sql immutable as $$ select regexp_replace(deaccent(t), '[^a-z0-9]+', '', 'g') $$;
 create or replace function public.today_fr() returns date language sql stable as $$ select (now() at time zone 'Europe/Paris')::date $$;
 create or replace function public.week_start() returns timestamptz language sql stable as $$ select (date_trunc('week', now() at time zone 'Europe/Paris')) at time zone 'Europe/Paris' $$;
 create or replace function public.month_start() returns timestamptz language sql stable as $$ select (date_trunc('month', now() at time zone 'Europe/Paris')) at time zone 'Europe/Paris' $$;

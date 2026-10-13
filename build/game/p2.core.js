@@ -132,6 +132,13 @@ const ctry=s=>L(s.country[0],s.country[1]);
 const PROGRAMS={bus1:['Business · Year 1','Commerce · 1re année'],bus2:['Business · Year 2','Commerce · 2e année'],eng1:['Engineering · Year 1','Ingénierie · 1re année'],eng2:['Engineering · Year 2','Ingénierie · 2e année'],log1:['Logistics · Master 1','Logistique · Master 1'],des3:['Design · Year 3','Design · 3e année'],cs2:['Computer Science · Year 2','Informatique · 2e année'],law1:['Law · Year 1','Droit · 1re année']};
 const PROG_IDS=Object.keys(PROGRAMS);
 const prog=id=>PROGRAMS[id]?L(PROGRAMS[id][0],PROGRAMS[id][1]):'—';
+/* Année d'études déclarée par le joueur. « Promo » = même école + même année. */
+const YEARS={'1':['Year 1','1re année'],'2':['Year 2','2e année'],'3':['Year 3','3e année'],'4':['Year 4','4e année'],'5':['Year 5','5e année'],'6':['Year 6 or more','6e année et plus']};
+const YEAR_IDS=Object.keys(YEARS);
+const yearName=y=>YEARS[y]?L(YEARS[y][0],YEARS[y][1]):'—';
+const yearLong=y=>YEARS[y]?yearName(y)+' · Bac+'+(y==='6'?'6+':y):'—';
+const P2Y={bus1:'1',bus2:'2',eng1:'1',eng2:'2',log1:'4',des3:'3',cs2:'2',law1:'1'};
+const normTxt=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/œ/g,'oe').replace(/æ/g,'ae').replace(/[^a-z0-9]+/g,'');
 
 /* Neon Sprint tracks: closed Catmull-Rom loops, resampled to 360 even steps. */
 function buildTrack(P){
@@ -315,7 +322,7 @@ const DEMO=(()=>{
     best.grid=miss()?null:Math.round(1800+s*5600+r()*800);
     best.words=miss()?null:Math.round(1200+s*5200+r()*700);
     best.aim=miss()?null:Math.round(3200+s*8800+r()*1500);
-    out.push({id:'p'+i,name,face:demoFace('p'+i),school,program,skill:s,rating:Math.round(860+s*800+(r()-.5)*140),best,weekly:Math.round(80+s*900+r()*420),monthly:Math.round(400+s*3200+r()*1300)});
+    out.push({id:'p'+i,name,face:demoFace('p'+i),school,program,year:P2Y[program],skill:s,rating:Math.round(860+s*800+(r()-.5)*140),best,weekly:Math.round(80+s*900+r()*420),monthly:Math.round(400+s*3200+r()*1300)});
   }
   return out;
 })();
@@ -371,7 +378,7 @@ let STORAGE_OK=true;
 function addDays(n){const d=new Date();d.setHours(18,0,0,0);d.setDate(d.getDate()+n);return d.getTime();}
 const DEF=()=>({v:2,lang:null,sound:true,
   account:{signedIn:false,username:LIVE?'invite':'ace_rookie',avatar:0,frame:'basic',skin:'violet'},
-  school:{id:'nbu',program:'bus2',status:'unverified',domain:null},
+  school:{id:LIVE?null:'nbu',program:'bus2',year:LIVE?null:'2',status:'unverified',domain:null},
   xp:0,rating:1000,streak:0,lastDay:null,
   bests:{},ghosts:{},history:[],
   daily:{day:dayKey(),att:{},best:{}},missions:{day:dayKey(),claimed:[]},ach:[],schoolPts:0,
@@ -398,9 +405,11 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S.data));}catch(e){S
 
 const S={route:'home',data:null,game:null,result:null,ctrl:null,
   ui:{lib:{cat:'all',mode:'all',diff:'all',sort:'pop'},rank:{view:'players',scope:'world',board:'rating',loading:false},
-      lobby:{game:null,mode:'trial',oppId:null,track:0,cat:'mix'},sheet:null,notif:false,campus:{edit:false,q:'',pick:null,program:null,err:null},
+      lobby:{game:null,mode:'trial',oppId:null,track:0,cat:'mix'},sheet:null,notif:false,campus:{edit:false,q:'',pick:null,year:null,err:null,adding:false,nn:'',nc:'',nco:''},
       admin:{err:null},calc:{mau:20000,conv:2,price:3.99,inst:5,instPrice:2400,spons:4,sponsPrice:1500}}};
 S.data=load();
+/* écoles ajoutées par le joueur en mode démo (en ligne, elles viennent du serveur) */
+if(!LIVE)(S.data.customSchools||[]).forEach(x=>{if(!SCH[x.id]){SCHOOLS.push(x);SCH[x.id]=x;}});
 LANG=S.data.lang||((navigator.language||'en').toLowerCase().startsWith('fr')?'fr':'en');
 document.documentElement.lang=LANG;
 
@@ -433,12 +442,12 @@ function BOARD(b){
   return {n:skName(b),lower:lower(b),f:v=>fmtScore(b,v)};
 }
 const BOARD_IDS=['rating',...SKS,'weekly','monthly'];
-const SCOPES=[['friends',()=>L('Friends','Amis')],['class',()=>L('Class','Classe')],['school',()=>L('School','École')],['city',()=>L('City','Ville')],['country',()=>L('Country','Pays')],['world',()=>L('World','Monde')]];
+const SCOPES=[['friends',()=>L('Friends','Amis')],['class',()=>L('Class','Promo')],['school',()=>L('School','École')],['city',()=>L('City','Ville')],['country',()=>L('Country','Pays')],['world',()=>L('World','Monde')]];
 function inScope(p,scope){
   const st=S.data,my=SCH[st.school.id],s=SCH[p.school];
   switch(scope){
     case 'friends':return FRIENDS.includes(p.id);
-    case 'class':return !!my&&p.school===st.school.id&&p.program===st.school.program;
+    case 'class':return !!my&&!!st.school.year&&p.school===st.school.id&&p.year===st.school.year;
     case 'school':return !!my&&p.school===st.school.id;
     case 'city':return !!my&&s.city===my.city;
     case 'country':return !!my&&s.country[0]===my.country[0];
@@ -476,9 +485,9 @@ function uniRows(){
 }
 function classRows(){
   const st=S.data;if(!SCH[st.school.id])return [];
-  const map={};PROG_IDS.forEach(p=>map[p]={id:p,pts:900+hashStr(p+st.school.id+weekStart())%1800,members:0,mine:p===st.school.program});
-  DEMO.filter(p=>p.school===st.school.id).forEach(p=>{map[p.program].pts+=p.weekly;map[p.program].members++;});
-  if(map[st.school.program]){map[st.school.program].pts+=st.schoolPts;map[st.school.program].members++;}
+  const map={};YEAR_IDS.slice(0,5).forEach(y=>map[y]={id:y,pts:900+hashStr(y+st.school.id+weekStart())%1800,members:0,mine:y===st.school.year});
+  DEMO.filter(p=>p.school===st.school.id).forEach(p=>{if(map[p.year]){map[p.year].pts+=p.weekly;map[p.year].members++;}});
+  if(map[st.school.year]){map[st.school.year].pts+=st.schoolPts;map[st.school.year].members++;}
   const rows=Object.values(map).sort((a,b)=>b.pts-a.pts);
   rows.forEach((r,i)=>{r.pos=i+1;const h=hashStr(r.id+'cmv'+weekStart());r.mv=h%3===0?0:(h%5)-2;});
   return rows;

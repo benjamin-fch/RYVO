@@ -44,6 +44,17 @@ create table if not exists public.profiles(
 );
 create unique index if not exists profiles_username_lower on public.profiles (lower(username));
 
+-- évolutions d'une base existante (sans perte de données)
+-- les joueurs ajoutent eux-mêmes leur école : le domaine e-mail devient facultatif
+alter table public.schools alter column domain drop not null;
+alter table public.schools add column if not exists created_by uuid references auth.users(id) on delete set null;
+-- année d'études déclarée par le joueur (1 = 1re année / Bac+1 … 6 = Bac+6 et plus)
+alter table public.profiles add column if not exists study_year text;
+alter table public.profiles add column if not exists school_set_at timestamptz;
+do $$ begin
+  alter table public.profiles add constraint profiles_study_year_check check (study_year in ('1','2','3','4','5','6'));
+exception when duplicate_object then null; end $$;
+
 create table if not exists public.admins(
   user_id uuid primary key references auth.users(id) on delete cascade,
   role text not null check (role in ('super','mod','content','partner')),
@@ -238,6 +249,11 @@ on conflict (id) do nothing;
 
 -- ---------- petits utilitaires ----------
 create or replace function public.ms(t timestamptz) returns bigint language sql immutable as $$ select (extract(epoch from t)*1000)::bigint $$;
+-- comparaison de noms d'écoles sans accents, majuscules ni ponctuation (« École Polytechnique » = « ecole polytechnique »)
+create or replace function public.deaccent(t text) returns text language sql immutable as $$
+  select translate(lower(coalesce(t,'')), 'àáâãäåāçćčèéêëēėęîïíīįìłñńôöòóœøōõßśšûüùúūÿýžźż',
+    'aaaaaaa' || 'ccc' || 'eeeeeee' || 'iiiiii' || 'l' || 'nn' || 'oooooooo' || 's' || 'ss' || 'uuuuu' || 'yy' || 'zzz') $$;
+create or replace function public.school_norm(t text) returns text language sql immutable as $$ select regexp_replace(deaccent(t), '[^a-z0-9]+', '', 'g') $$;
 create or replace function public.today_fr() returns date language sql stable as $$ select (now() at time zone 'Europe/Paris')::date $$;
 create or replace function public.week_start() returns timestamptz language sql stable as $$ select (date_trunc('week', now() at time zone 'Europe/Paris')) at time zone 'Europe/Paris' $$;
 create or replace function public.month_start() returns timestamptz language sql stable as $$ select (date_trunc('month', now() at time zone 'Europe/Paris')) at time zone 'Europe/Paris' $$;
@@ -340,7 +356,8 @@ begin
   return jsonb_build_object(
     'games', (select coalesce(jsonb_agg(jsonb_build_object('id',id,'on',is_on,'featured',featured,'daily',daily) order by sort),'[]') from games),
     'daily', jsonb_build_object('game', v_d.game, 'track', v_d.track, 'day', today_fr()),
-    'schools', (select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'short',short,'city',city,'country',country,'domain',domain,'col',col) order by name),'[]') from schools),
+    'schools', (select coalesce(jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'short',s.short,'city',s.city,'country',s.country,'domain',s.domain,'col',s.col,
+                 'members',(select count(*) from profiles p where p.school_id = s.id and p.status <> 'banned')) order by s.name),'[]') from schools s),
     'season', (select jsonb_build_object('n', n, 'ends', ms(ends_at)) from seasons where closed_at is null order by n desc limit 1),
     'tracks', setting('tracks'),
     'comps', (select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'game',game,'format',format,'starts',ms(starts_at),'ends',ms(ends_at),'reward',reward,'school',school_id) order by starts_at),'[]')
@@ -367,7 +384,8 @@ begin
   end loop;
   return jsonb_build_object(
     'id', v_p.id, 'username', v_p.username, 'avatar', v_p.avatar, 'frame', v_p.frame, 'skin', v_p.skin, 'lang', v_p.lang,
-    'school_id', v_p.school_id, 'program', v_p.program, 'xp', v_p.xp, 'level', level_of(v_p.xp), 'rating', v_p.rating, 'streak', v_p.streak,
+    'school_id', v_p.school_id, 'program', v_p.program, 'study_year', v_p.study_year,
+    'school_lock_until', case when v_p.school_set_at between now() - interval '30 days' and now() - interval '24 hours' then ms(v_p.school_set_at + interval '30 days') end, 'xp', v_p.xp, 'level', level_of(v_p.xp), 'rating', v_p.rating, 'streak', v_p.streak,
     'status', v_p.status, 'until', ms(v_p.suspended_until), 'verified', v_p.verified, 'plus', v_p.plus,
     'admin', (select role from admins where user_id = v_uid),
     'bests', user_bests(v_uid),
@@ -415,15 +433,67 @@ begin
   if p ? 'school_id' then
     if p->>'school_id' is not null and not exists(select 1 from schools where id = p->>'school_id') then raise exception 'unknown_school'; end if;
     if p->>'school_id' is distinct from v_p.school_id then
-      update profiles set school_id = p->>'school_id', verified = false where id = v_uid;
+      -- on peut corriger son choix pendant 24 h, puis l'école est fixée 30 jours (évite de changer d'équipe en cours de Coupe)
+      if p->>'school_id' is not null and v_p.school_set_at between now() - interval '30 days' and now() - interval '24 hours' then
+        raise exception 'school_locked:%', ms(v_p.school_set_at + interval '30 days');
+      end if;
+      update profiles set school_id = p->>'school_id', verified = false,
+        school_set_at = case when p->>'school_id' is null then school_set_at when school_set_at is null or school_set_at < now() - interval '24 hours' then now() else school_set_at end
+        where id = v_uid;
       update verifications set status = 'rejected', decided_at = now() where user_id = v_uid and status = 'pending';
     end if;
+  end if;
+  if p ? 'study_year' then
+    if p->>'study_year' is not null and p->>'study_year' not in ('1','2','3','4','5','6') then raise exception 'bad_year'; end if;
+    update profiles set study_year = p->>'study_year' where id = v_uid;
   end if;
   if p ? 'program' then
     if p->>'program' is not null and p->>'program' not in ('bus1','bus2','eng1','eng2','log1','des3','cs2','law1') then raise exception 'unknown_program'; end if;
     update profiles set program = p->>'program' where id = v_uid;
   end if;
   return me();
+end $$;
+
+-- ---------- ajouter son école (les joueurs créent eux-mêmes les établissements manquants) ----------
+create or replace function public.add_school(p_name text, p_city text, p_country text default 'France') returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid(); v_p profiles; v_s schools; v_short text := ''; v_base text; v_i int := 1; v_w text;
+  v_n text := regexp_replace(trim(coalesce(p_name,'')), '\s+', ' ', 'g');
+  v_c text := regexp_replace(trim(coalesce(p_city,'')), '\s+', ' ', 'g');
+  v_co text := coalesce(nullif(regexp_replace(trim(coalesce(p_country,'')), '\s+', ' ', 'g'), ''), 'France');
+  v_cols text[] := array['#5B4BFF','#FF6B3D','#3D7BFF','#14B37A','#FF4FA0','#E0A100','#00A6C8','#8B5CF6','#F23F55'];
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  v_p := ensure_active(v_uid);
+  if length(v_n) not between 3 and 80 or length(school_norm(v_n)) < 2 or v_n ~* '(https?:|www\.|@|<|>)' then raise exception 'bad_school_name'; end if;
+  if length(v_c) not between 2 and 60 or v_c !~ '[[:alpha:]]' or v_c ~ '[<>@]' then raise exception 'bad_city'; end if;
+  if length(v_co) not between 2 and 40 or v_co ~ '[<>@]' then raise exception 'bad_country'; end if;
+  -- déjà présente ? (même nom, ou même sigle, dans la même ville) → on renvoie l'existante
+  select * into v_s from schools
+    where school_norm(city) = school_norm(v_c) and (school_norm(name) = school_norm(v_n) or school_norm(short) = school_norm(v_n))
+    order by (school_norm(name) = school_norm(v_n)) desc limit 1;
+  if v_s.id is not null then
+    return jsonb_build_object('id', v_s.id, 'name', v_s.name, 'short', v_s.short, 'city', v_s.city, 'country', v_s.country, 'domain', v_s.domain, 'col', v_s.col,
+      'members', (select count(*) from profiles where school_id = v_s.id and status <> 'banned'), 'existed', true);
+  end if;
+  if (select count(*) from schools where created_by = v_uid and created_at > now() - interval '1 day') >= 3
+     or (select count(*) from schools where created_by = v_uid) >= 10 then raise exception 'rate_limited'; end if;
+  -- sigle : on garde les sigles tapés en majuscules (« EM », « HEC »), sinon l'initiale de chaque mot
+  for v_w in select w from regexp_split_to_table(v_n, '[^[:alnum:]]+') with ordinality t(w, i) where w <> '' order by i loop
+    continue when deaccent(v_w) in ('de','du','des','la','le','les','l','d','et','en','of','the','and','a','au','aux','for','at');
+    v_short := v_short || case when v_w ~ '^[[:upper:][:digit:]]{2,5}$' then upper(deaccent(v_w)) else upper(left(deaccent(v_w), 1)) end;
+  end loop;
+  v_short := left(regexp_replace(v_short, '[^A-Z0-9]', '', 'g'), 5);
+  if length(v_short) < 2 then v_short := upper(left(school_norm(v_n), 3)); end if;
+  v_base := v_short;
+  while exists(select 1 from schools where short = v_short) loop
+    v_short := left(v_base, 5 - length(v_i::text)) || v_i; v_i := v_i + 1;
+  end loop;
+  insert into schools(name, short, city, country, domain, col, status, created_by)
+  values (v_n, v_short, v_c, v_co, null, v_cols[1 + ((hashtext(school_norm(v_n))::bigint % 9) + 9) % 9], 'none', v_uid)
+  returning * into v_s;
+  return jsonb_build_object('id', v_s.id, 'name', v_s.name, 'short', v_s.short, 'city', v_s.city, 'country', v_s.country, 'domain', v_s.domain, 'col', v_s.col, 'members', 0, 'existed', false);
 end $$;
 
 -- ---------- lancer une partie ----------
@@ -758,6 +828,7 @@ begin
   if v_uid is not null then select * into v_me from profiles where id = v_uid; select * into v_sch from schools where id = v_me.school_id; end if;
   if p_scope = 'friends' then return jsonb_build_object('rows', '[]'::jsonb, 'me', null, 'total', 0, 'unsupported', true); end if;
   if p_scope in ('school','class','city','country') and v_sch.id is null then return jsonb_build_object('rows', '[]'::jsonb, 'me', null, 'total', 0, 'need_school', true); end if;
+  if p_scope = 'class' and v_me.study_year is null then return jsonb_build_object('rows', '[]'::jsonb, 'me', null, 'total', 0, 'need_year', true); end if;
   v_lower := p_board not in ('rating','weekly','monthly') and game_lower(split_part(p_board, '@', 1));
   with cand as (
     select p.id, p.username, p.avatar, p.frame, p.school_id,
@@ -770,7 +841,7 @@ begin
     from profiles p left join schools s on s.id = p.school_id
     where p.status <> 'banned' and (p_scope = 'world'
       or (p_scope = 'school' and p.school_id = v_sch.id)
-      or (p_scope = 'class' and p.school_id = v_sch.id and p.program is not distinct from v_me.program)
+      or (p_scope = 'class' and p.school_id = v_sch.id and p.study_year = v_me.study_year)
       or (p_scope = 'city' and s.city = v_sch.city)
       or (p_scope = 'country' and s.country = v_sch.country))
   ), ranked as (
@@ -804,25 +875,25 @@ language sql stable security definer set search_path = public as $$
     select sc.id, sc.name, sc.short, sc.city, sc.col,
       (select count(*) from profiles p where p.school_id = sc.id and p.status <> 'banned') members,
       coalesce((select sum((r.extra->>'school_pts')::int) from runs r join profiles p on p.id = r.user_id
-                where p.school_id = sc.id and p.verified and r.status = 'valid' and r.mode = 'school' and r.submitted_at >= week_start()), 0) pts
+                where p.school_id = sc.id and p.status <> 'banned' and r.status = 'valid' and r.mode = 'school' and r.submitted_at >= week_start()), 0) pts
     from schools sc
   )
   select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'short',short,'city',city,'col',col,'members',members,'pts',pts,'pos',pos,
     'mine', id = (select school_id from profiles where id = auth.uid()),
     'you', case when id = (select school_id from profiles where id = auth.uid()) then
       (select coalesce(sum((extra->>'school_pts')::int),0) from runs where user_id = auth.uid() and status = 'valid' and mode = 'school' and submitted_at >= week_start()) else 0 end) order by pos), '[]')
-  from (select s.*, row_number() over (order by pts desc, name) pos from s) x $$;
+  from (select s.*, row_number() over (order by pts desc, name) pos from s where members > 0) x $$;
 
 create or replace function public.class_cup() returns jsonb
 language sql stable security definer set search_path = public as $$
-  with me as (select school_id, program from profiles where id = auth.uid()),
+  with me as (select school_id, study_year from profiles where id = auth.uid()),
   c as (
-    select p.program, count(*) members,
+    select p.study_year, count(*) members,
       coalesce(sum((select sum((r.extra->>'school_pts')::int) from runs r where r.user_id = p.id and r.status = 'valid' and r.mode = 'school' and r.submitted_at >= week_start())), 0) pts
-    from profiles p, me where p.school_id = me.school_id and p.program is not null and p.status <> 'banned' group by p.program
+    from profiles p, me where p.school_id = me.school_id and p.study_year is not null and p.status <> 'banned' group by p.study_year
   )
-  select coalesce(jsonb_agg(jsonb_build_object('id',program,'members',members,'pts',pts,'pos',pos,'mine', program = (select program from me)) order by pos), '[]')
-  from (select c.*, row_number() over (order by pts desc, program) pos from c) x $$;
+  select coalesce(jsonb_agg(jsonb_build_object('id',study_year,'members',members,'pts',pts,'pos',pos,'mine', study_year = (select study_year from me)) order by pos), '[]')
+  from (select c.*, row_number() over (order by pts desc, study_year) pos from c) x $$;
 
 create or replace function public.recent_activity() returns jsonb
 language sql stable security definer set search_path = public as $$
@@ -851,6 +922,7 @@ begin
   if v_uid is null then raise exception 'not_authenticated'; end if;
   select * into v_s from schools where id = p_school;
   if v_s.id is null then raise exception 'unknown_school'; end if;
+  if v_s.domain is null then raise exception 'no_domain'; end if;
   if v_e !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'bad_email'; end if;
   if split_part(v_e, '@', 2) <> v_s.domain then raise exception 'domain_mismatch'; end if;
   if (select count(*) from verifications where user_id = v_uid and created_at > now() - interval '1 day') >= 3 then raise exception 'rate_limited'; end if;
@@ -976,7 +1048,7 @@ end $$;
 -- ---------- joueurs ----------
 create or replace function public.admin_player_row(p profiles) returns jsonb
 language sql stable security definer set search_path = public as $$
-  select jsonb_build_object('id', p.id, 'name', p.username, 'school', p.school_id, 'program', p.program, 'level', level_of(p.xp), 'xp', p.xp, 'rating', p.rating,
+  select jsonb_build_object('id', p.id, 'name', p.username, 'school', p.school_id, 'program', p.program, 'year', p.study_year, 'level', level_of(p.xp), 'xp', p.xp, 'rating', p.rating,
     'matches', (select count(*) from runs r where r.user_id = p.id and r.submitted_at is not null),
     'joined', ms(p.created_at), 'last', ms(p.last_seen), 'status', p.status, 'until', ms(p.suspended_until), 'verified', p.verified, 'plus', p.plus,
     'mail', mask_email((select email from auth.users u where u.id = p.id)),
@@ -1360,6 +1432,7 @@ begin
   perform admin_require('partner');
   return jsonb_build_object(
     'schools', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'name', s.name, 'short', s.short, 'city', s.city, 'country', s.country, 'domain', s.domain, 'col', s.col, 'status', s.status,
+        'by_player', s.created_by is not null, 'creator', (select username from profiles where id = s.created_by), 't', ms(s.created_at),
         'players', (select count(*) from profiles p where p.school_id = s.id), 'verified', (select count(*) from profiles p where p.school_id = s.id and p.verified)) order by s.name), '[]') from schools s),
     'verifs', (select coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'player', jsonb_build_object('id', p.id, 'name', p.username), 'school', v.school_id,
         'local', left(split_part(v.email,'@',1),1) || '***', 'domain', split_part(v.email,'@',2), 'match', split_part(v.email,'@',2) = s.domain, 'method', v.method, 't', ms(v.created_at)) order by v.created_at), '[]')
@@ -1369,14 +1442,14 @@ end $$;
 
 create or replace function public.admin_save_school(p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v_id text := nullif(p->>'id',''); v_short text := upper(trim(p->>'short')); v_dom text := lower(regexp_replace(trim(p->>'domain'), '^@', ''));
+declare v_id text := nullif(p->>'id',''); v_short text := upper(trim(p->>'short')); v_dom text := nullif(lower(regexp_replace(trim(coalesce(p->>'domain','')), '^@', '')), '');
 begin
   perform admin_require('partner');
   if length(trim(coalesce(p->>'name',''))) < 3 then raise exception 'name_too_short'; end if;
   if v_short !~ '^[A-Z0-9]{2,5}$' then raise exception 'bad_short'; end if;
-  if v_dom !~ '^[a-z0-9-]+(\.[a-z0-9-]+)+$' then raise exception 'bad_domain'; end if;
+  if v_dom is not null and v_dom !~ '^[a-z0-9-]+(\.[a-z0-9-]+)+$' then raise exception 'bad_domain'; end if;
   if exists(select 1 from schools where short = v_short and id is distinct from v_id) then raise exception 'short_taken'; end if;
-  if exists(select 1 from schools where domain = v_dom and id is distinct from v_id) then raise exception 'domain_taken'; end if;
+  if v_dom is not null and exists(select 1 from schools where domain = v_dom and id is distinct from v_id) then raise exception 'domain_taken'; end if;
   if coalesce(trim(p->>'city'),'') = '' then raise exception 'city_required'; end if;
   if v_id is null then
     insert into schools(name, short, city, country, domain, col, status) values (trim(p->>'name'), v_short, trim(p->>'city'), coalesce(nullif(trim(p->>'country'),''),'France'), v_dom, coalesce(p->>'col','#5B4BFF'), coalesce(p->>'status','none'));
@@ -1388,6 +1461,37 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
+-- fusionner un doublon (ex. « EM Normandie » ajoutée deux fois) : joueurs, demandes et compétitions passent sur l'école gardée
+create or replace function public.admin_merge_school(p_from text, p_into text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_f schools; v_t schools; v_n int;
+begin
+  perform admin_require('partner');
+  select * into v_f from schools where id = p_from; select * into v_t from schools where id = p_into;
+  if v_f.id is null or v_t.id is null or v_f.id = v_t.id then raise exception 'bad_target'; end if;
+  update profiles set school_id = v_t.id where school_id = v_f.id; get diagnostics v_n = row_count;
+  update verifications set school_id = v_t.id where school_id = v_f.id;
+  update competitions set school_id = v_t.id where school_id = v_f.id;
+  update campus_managers set school_id = v_t.id where school_id = v_f.id;
+  delete from schools where id = v_f.id;
+  perform audit('a fusionné l’établissement', v_f.name || ' (' || v_f.short || ') → ' || v_t.name || ' (' || v_t.short || ')', v_n || ' joueur(s)');
+  return jsonb_build_object('ok', true, 'moved', v_n);
+end $$;
+
+-- supprimer un établissement (nom inapproprié, faux établissement) : ses joueurs n'ont plus d'école
+create or replace function public.admin_delete_school(p_id text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_s schools; v_n int;
+begin
+  perform admin_require('partner');
+  select * into v_s from schools where id = p_id; if v_s.id is null then raise exception 'not_found'; end if;
+  select count(*) into v_n from profiles where school_id = v_s.id;
+  update profiles set school_id = null, verified = false, school_set_at = null where school_id = v_s.id;
+  delete from schools where id = v_s.id;
+  perform audit('a supprimé l’établissement', v_s.name, v_n || ' joueur(s) détaché(s)');
+  return jsonb_build_object('ok', true, 'detached', v_n);
+end $$;
+
 create or replace function public.admin_verif_action(p_id uuid, p_action text) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare v_v verifications; v_s schools; v_p profiles;
@@ -1396,7 +1500,7 @@ begin
   select * into v_v from verifications where id = p_id and status = 'pending'; if v_v.id is null then raise exception 'not_pending'; end if;
   select * into v_s from schools where id = v_v.school_id; select * into v_p from profiles where id = v_v.user_id;
   if p_action = 'ok' then
-    if split_part(v_v.email,'@',2) <> v_s.domain then raise exception 'domain_mismatch'; end if;
+    if v_s.domain is null or split_part(v_v.email,'@',2) <> v_s.domain then raise exception 'domain_mismatch'; end if;
     update verifications set status = 'approved', decided_at = now() where id = p_id;
     update profiles set verified = true, school_id = v_v.school_id where id = v_v.user_id;
     perform audit('a vérifié l’étudiant', v_p.username, v_s.short);
@@ -1711,7 +1815,7 @@ grant execute on function public.public_info(), public.leaderboard(text,text,int
 -- joueurs connectés
 grant execute on function public.me(), public.update_profile(jsonb), public.start_run(text,text,int,text,text), public.answer_question(uuid,int,int,numeric),
   public.word_event(uuid,int,text,text), public.submit_run(uuid,jsonb), public.class_cup(), public.report_player(uuid,text,text),
-  public.request_verification(text,text), public.export_my_data(), public.delete_my_account(), public.claim_admin_invite() to authenticated;
+  public.request_verification(text,text), public.add_school(text,text,text), public.export_my_data(), public.delete_my_account(), public.claim_admin_invite() to authenticated;
 
 -- console admin (chaque fonction vérifie elle-même le rôle et la double authentification)
 grant execute on function public.admin_me(), public.admin_counts(), public.admin_overview(),
@@ -1721,6 +1825,6 @@ grant execute on function public.admin_me(), public.admin_counts(), public.admin
   public.admin_questions(), public.admin_save_question(jsonb), public.admin_question_action(uuid,text), public.admin_words(text), public.admin_word(text,text,text,text),
   public.admin_games(), public.admin_set_game(text,text,boolean),
   public.admin_comps(), public.admin_save_comp(jsonb), public.admin_comp_action(uuid,text), public.admin_set_daily(jsonb), public.admin_season_action(text,timestamptz),
-  public.admin_schools(), public.admin_save_school(jsonb), public.admin_verif_action(uuid,text), public.admin_manager(text,jsonb),
+  public.admin_schools(), public.admin_save_school(jsonb), public.admin_merge_school(text,text), public.admin_delete_school(text), public.admin_verif_action(uuid,text), public.admin_manager(text,jsonb),
   public.admin_business(), public.admin_invoice(text,jsonb), public.admin_sponsor(jsonb),
   public.admin_team(), public.admin_team_action(text,jsonb), public.admin_log(text,int) to authenticated;

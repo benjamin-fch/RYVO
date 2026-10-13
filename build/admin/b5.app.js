@@ -52,6 +52,8 @@ const ACT={
   verif:async a=>{const [id,w]=a.split(':');try{await act('admin_verif_action',{p_id:id,p_action:w},w==='ok'?'Étudiant vérifié.':'Demande refusée.');loadSection();}catch(e){}},
   mgrDel:async a=>{try{await act('admin_manager',{p_action:'remove',p:{id:a}},'Responsable retiré.');loadSection();}catch(e){}},
   schoolEdit:a=>openLayer({type:'school',id:a||null}),
+  askSchoolMerge:a=>{const s=S.d.schools.schools.find(x=>x.id===a);confirmBox({kind:'schoolMerge',sid:a,title:`Fusionner « ${s.name} » (${s.city}) ?`,body:`Ses ${s.players} joueur${s.players>1?'s':''}, demandes de badge et compétitions passent sur l’école choisie ci-dessous, puis « ${s.name} » est supprimée. Irréversible.`,ok:'Fusionner',danger:true});},
+  askSchoolDel:a=>{const s=S.d.schools.schools.find(x=>x.id===a);confirmBox({kind:'schoolDel',sid:a,title:`Supprimer « ${s.name} » ?`,body:s.players?`Ses ${s.players} joueur${s.players>1?'s':''} n’auront plus d’école et devront en choisir une autre. Pour un doublon, préfère « Fusionner ».`:'Aucun joueur n’est rattaché à cette école.',ok:'Supprimer',danger:true,word:s.players?'supprimer':null});},
   inv:async a=>{const [w,id]=a.split(/:(.+)/);try{await act('admin_invoice',{p_action:w,p:{id}},w==='paid'?'Facture marquée payée.':'Relance notée au journal.');loadSection();}catch(e){}},
   askRemove:(a,el)=>confirmBox({kind:'removeAdmin',uid:a,title:`Retirer ${el.dataset.n} de l’équipe ?`,body:'Son compte joueur reste actif, mais il perd l’accès à la console.',ok:'Retirer',danger:true}),
   cancelInvite:async a=>{try{S.d.team=await act('admin_team_action',{p_action:'cancel_invite',p:{mail:a}},'Invitation annulée.');render();}catch(e){}},
@@ -65,6 +67,8 @@ const ACT={
       if(c.kind==='qDel')await act('admin_question_action',{p_id:c.qid,p_action:'delete'},'Question supprimée.');
       if(c.kind==='compCancel')await act('admin_comp_action',{p_id:c.cid,p_action:'cancel'},'Compétition annulée.');
       if(c.kind==='seasonClose')await act('admin_season_action',{p_action:'close'},'Nouvelle saison lancée.');
+      if(c.kind==='schoolMerge')await act('admin_merge_school',{p_from:c.sid,p_into:$('#cfInto').value},'Écoles fusionnées.');
+      if(c.kind==='schoolDel')await act('admin_delete_school',{p_id:c.sid},'École supprimée.');
       if(c.kind==='removeAdmin')S.d.team=await act('admin_team_action',{p_action:'remove',p:{id:c.uid}},'Membre retiré.');
       closeLayer();loadSection();
     }catch(e){}

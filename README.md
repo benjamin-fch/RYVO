@@ -63,7 +63,14 @@ Les autres membres de l'équipe s'ajoutent ensuite depuis la console (**Équipe 
 
 ### 5. Ajouter du contenu
 
-Depuis la console : écoles (avec leur domaine e-mail, pour la vérification étudiante), questions de quiz, mots, jeu du jour, compétitions. Le script installe déjà un jeu de questions et de mots de départ.
+Depuis la console : questions de quiz, mots, jeu du jour, compétitions. Le script installe déjà un jeu de questions et de mots de départ.
+
+**Écoles et années : ce sont les joueurs qui les renseignent.** Après l'inscription, une fenêtre demande l'école (recherche, ou « Ajouter » si elle n'existe pas : nom, ville, pays) et l'année d'études (1re à 6e année et plus). La « promo » d'un joueur = même école + même année.
+
+- Les doublons sont évités automatiquement (accents, majuscules, ponctuation et sigle ignorés dans la même ville). Un joueur peut ajouter 3 écoles par jour, 10 au total.
+- L'école peut être corrigée pendant 24 h, puis elle reste 30 jours (on ne change pas d'équipe en pleine Coupe). L'année se modifie à tout moment.
+- Les points de Coupe comptent tout de suite. Le badge « vérifié » est un bonus facultatif : il n'est possible que si tu ajoutes le domaine e-mail de l'école dans la console.
+- Dans la console (**Écoles**), tu vois qui a ajouté chaque école et tu peux la renommer, **fusionner** deux doublons ou la **supprimer**.
 
 ---
 

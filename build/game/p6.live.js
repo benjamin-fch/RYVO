@@ -9,13 +9,15 @@ const sb=LIVE?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSes
 async function rpc(fn,args){const {data,error}=await sb.rpc(fn,args||{});if(error)throw new Error(error.message||String(error));return data;}
 function errText(e){
   const m=String(e&&e.message||e||'');
+  if(/^school_locked:(\d+)/.test(m)){const d=new Date(+m.split(':')[1]);return L(`You changed school recently. You can switch again from ${d.toLocaleDateString(LOC())}.`,`Tu as changé d’école récemment. Tu pourras en changer à nouveau à partir du ${d.toLocaleDateString(LOC())}.`);}
   if(/^suspended:(\d+)/.test(m)){const d=new Date(+m.split(':')[1]);return L(`Your account is suspended until ${d.toLocaleDateString(LOC())}.`,`Ton compte est suspendu jusqu’au ${d.toLocaleDateString(LOC())}.`);}
   const T={not_authenticated:['Sign in to continue.','Connecte-toi pour continuer.'],banned:['This account is banned.','Ce compte est banni.'],game_unavailable:['This game is unavailable right now.','Ce jeu est indisponible pour le moment.'],
     daily_limit:['No Daily attempts left for this game today.','Plus d’essais du jour pour ce jeu.'],not_daily_game:['Today’s Daily changed. Reload the page.','Le Défi du jour a changé. Recharge la page.'],
     no_school:['Link a school in Campus first.','Lie d’abord une école dans Campus.'],rate_limited:['Too many actions in a short time. Try again in a few minutes.','Trop d’actions en peu de temps. Réessaie dans quelques minutes.'],
     username_taken:['That username is taken.','Ce pseudo est déjà pris.'],bad_username:['Use 3–16 letters, numbers, dots or underscores.','3 à 16 lettres, chiffres, points ou tirets bas.'],reserved_username:['That username is reserved.','Ce pseudo est réservé.'],
     locked_item:['Unlock this item by levelling up.','Débloque cet élément en montant de niveau.'],domain_mismatch:['That address isn’t from this school.','Cette adresse n’est pas celle de l’école.'],bad_email:['Enter a valid email address.','Saisis une adresse e-mail valide.'],
-    unknown_school:['Unknown school.','École inconnue.'],bad_target:['You can’t report this player.','Tu ne peux pas signaler ce joueur.'],expired:['This match took too long and expired.','Ce match a expiré.'],bad_run:['This match is already closed.','Ce match est déjà clos.'],
+    unknown_school:['Unknown school.','École inconnue.'],bad_school_name:['Enter the full name of your school, without links.','Écris le nom complet de ton école, sans lien.'],bad_city:['Enter the city of your campus.','Indique la ville de ton campus.'],
+    bad_country:['Check the country.','Vérifie le pays.'],bad_year:['Choose your year of study.','Choisis ton année d’études.'],no_domain:['This school has no email domain yet, so it can’t be verified for now.','Cette école n’a pas encore de domaine e-mail : la vérification n’est pas possible pour l’instant.'],bad_target:['You can’t report this player.','Tu ne peux pas signaler ce joueur.'],expired:['This match took too long and expired.','Ce match a expiré.'],bad_run:['This match is already closed.','Ce match est déjà clos.'],
     time_over:['Time’s up.','Temps écoulé.'],not_enough_questions:['Not enough questions yet. Try another game.','Pas encore assez de questions. Essaie un autre jeu.'],not_enough_words:['Not enough words yet. Try another game.','Pas encore assez de mots. Essaie un autre jeu.'],
     last_super_admin:['You are the last super admin: hand over the role before deleting your account.','Tu es le dernier super admin : transmets le rôle avant de supprimer ton compte.']};
   for(const k in T)if(m===k||m.startsWith(k))return L(T[k][0],T[k][1]);
@@ -116,7 +118,7 @@ function accountCardLive(){
   if(!NET.user)return `<section class="card c6"><div class="card-h"><h2>${L('Account','Compte')}</h2></div><p class="tiny">${L('Create an account to save your progress on every device.','Crée un compte pour retrouver ta progression sur tous tes appareils.')}</p><div class="row"><button class="btn primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button><button class="btn" type="button" data-act="auth" data-a="login">${L('Sign in','Connexion')}</button></div></section>`;
   return `<section class="card c6"><div class="card-h"><h2>${L('Account and data','Compte et données')}</h2></div>
     <form data-form="uname" class="row" novalidate style="align-items:flex-end"><div class="field" style="flex:1;min-width:160px"><label for="unInput">${L('Username','Pseudo')}</label><input class="input" id="unInput" name="user" maxlength="16" value="${esc(st.account.username)}"></div><button class="btn" type="submit">${L('Save','Enregistrer')}</button></form>
-    <dl class="cmp"><dt>E-mail</dt><dd>${esc(NET.user.email||'')}</dd><dt>${L('School','École')}</dt><dd>${SCH[st.school.id]?esc(SCH[st.school.id].short)+(st.school.status==='verified'?' ✓':''):L('None','Aucune')}</dd><dt>${L('Language','Langue')}</dt><dd>${LANG==='fr'?'Français':'English'}</dd></dl>
+    <dl class="cmp"><dt>E-mail</dt><dd>${esc(NET.user.email||'')}</dd><dt>${L('School','École')}</dt><dd>${SCH[st.school.id]?esc(SCH[st.school.id].short)+(st.school.status==='verified'?' ✓':'')+(st.school.year?' · '+esc(yearName(st.school.year)):''):L('None','Aucune')}</dd><dt>${L('Language','Langue')}</dt><dd>${LANG==='fr'?'Français':'English'}</dd></dl>
     <p class="tiny">${L('Your password is handled by the sign-in service and never seen by RYVO. You can download or delete your data at any time.','Ton mot de passe est géré par le service de connexion, RYVO ne le voit jamais. Tu peux télécharger ou supprimer tes données à tout moment.')}</p>
     <div class="row"><button class="btn sm" type="button" data-act="export">${L('Download my data','Télécharger mes données')}</button><button class="btn sm" type="button" data-act="signout">${L('Sign out','Se déconnecter')}</button><button class="btn sm ghost" type="button" data-act="reset" style="color:var(--bad)">${L('Delete my account','Supprimer mon compte')}</button></div></section>`;
 }
@@ -143,7 +145,7 @@ authHTML=function(sh){
     <div class="field"><label for="aPw">${L('Password','Mot de passe')}</label><input class="input" id="aPw" name="pw" type="password" autocomplete="new-password">${e.pw?`<span class="err">${e.pw}</span>`:`<span class="help">${L('At least 8 characters with a number.','Au moins 8 caractères dont un chiffre.')}</span>`}</div>
     <div class="field"><label for="aUser">${L('Username','Pseudo')}</label><input class="input" id="aUser" name="user" maxlength="16" autocomplete="nickname" value="${esc(v.user||'')}">${e.user?`<span class="err">${e.user}</span>`:`<span class="help">${L('3–16 letters, numbers, dot or underscore. Shown on leaderboards.','3 à 16 lettres, chiffres, point ou tiret bas. Affiché dans les classements.')}</span>`}</div>
     <div class="field"><span class="lab">Avatar</span><div class="choice">${AV_PRESETS.map((a,i)=>a.premium?'':`<button type="button" data-act="authAv" data-a="${i}" aria-pressed="${(sh.av??0)===i}">${face(a,34)}</button>`).join('')}</div></div>
-    <div class="field"><label for="aSchool">${L('School (optional)','École (optionnel)')}</label><select class="input" id="aSchool" name="school"><option value="">${L('Skip for now','Plus tard')}</option>${SCHOOLS.map(x=>`<option value="${x.id}" ${v.school===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <p class="tiny">${ic('campus',14)} ${L('You’ll add your school and your year right after, once signed in.','Tu indiqueras ton école et ton année juste après, une fois connecté.')}</p>
     <label class="tiny" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" name="age" ${v.age?'checked':''} style="margin-top:3px"> <span>${L('I am 15 or older, or I have my parents’ permission.','J’ai 15 ans ou plus, ou l’accord de mes parents.')}</span></label>${e.age?`<span class="err">${e.age}</span>`:''}
     ${err}<button class="btn primary" type="submit">${L('Create my account','Créer mon compte')}</button></form>`;
 };
@@ -167,7 +169,7 @@ function applyMe(m){
   if(st.uid!==m.id){const keep={lang:st.lang,sound:st.sound};S.data=Object.assign(DEF(),keep,{uid:m.id});}
   const d=S.data;NET.me=m;
   d.account.signedIn=true;d.account.username=m.username;d.account.avatar=m.avatar;d.account.frame=m.frame;d.account.skin=m.skin;
-  d.school={id:m.school_id,program:m.program||'bus2',status:m.verified?'verified':(m.verification&&m.verification.status==='pending'&&m.verification.school===m.school_id?'pending':'unverified'),domain:m.verification?m.verification.domain:null};
+  d.school={id:m.school_id,program:m.program||'bus2',year:m.study_year||null,status:m.verified?'verified':(m.verification&&m.verification.status==='pending'&&m.verification.school===m.school_id?'pending':'unverified'),domain:m.verification?m.verification.domain:null};
   d.xp=m.xp;d.rating=m.rating;d.streak=m.streak;
   d.bests={};Object.entries(m.bests||{}).forEach(([k,v])=>d.bests[k]=Number(v));
   d.history=(m.runs||[]).map(r=>({g:r.g,sk:r.sk,m:r.m,s:Number(r.s),o:r.o,opp:r.opp,xp:r.xp,dr:r.dr,t:r.t,x:r.x==null?undefined:Number(r.x),w:r.w,st:r.st}));
@@ -179,14 +181,27 @@ function applyMe(m){
 function applyInfo(info){
   NET.info=info;
   SCHOOLS.length=0;Object.keys(SCH).forEach(k=>delete SCH[k]);
-  (info.schools||[]).forEach(x=>{const s={id:x.id,name:x.name,short:x.short,city:x.city,country:[x.country,x.country],domain:x.domain,col:x.col};SCHOOLS.push(s);SCH[s.id]=s;});
+  (info.schools||[]).forEach(addSchoolLocal);
   const on=new Set((info.games||[]).filter(g=>g.on).map(g=>g.id));
   GAMES.forEach(g=>{if(g.id!=='party'){g.playable=on.has(g.id);if(!g.playable)g.eta=()=>L('Temporarily unavailable','Indisponible pour le moment');}});
   PLAYABLE.length=0;GAMES.filter(g=>g.playable).forEach(g=>PLAYABLE.push(g));
 }
-async function loadMe(){if(!NET.user)return;try{applyMe(await rpc('me'));}catch(e){toast(errText(e));}softRender();}
+function addSchoolLocal(x){const s={id:x.id,name:x.name,short:x.short,city:x.city,country:[x.country,x.country],domain:x.domain,col:x.col,members:Number(x.members)||0};
+  const i=SCHOOLS.findIndex(y=>y.id===s.id);if(i>=0)SCHOOLS[i]=s;else SCHOOLS.push(s);SCH[s.id]=s;return s;}
+async function loadMe(){if(!NET.user)return;try{applyMe(await rpc('me'));maybeOnboard();}catch(e){toast(errText(e));}softRender();}
+/* Juste après l'inscription (ou tant que ce n'est pas fait) : demander l'école et l'année, une fois par session, avec « Plus tard ». */
+function maybeOnboard(){
+  const m=NET.me;if(!m||NET.onb||(m.school_id&&m.study_year))return;
+  try{if(localStorage.getItem('ryvo.onb.'+m.id))return;}catch(e){}
+  /* pas pendant une partie ni sur l'écran de résultat (on laisse rejouer tout de suite après une connexion) */
+  if(S.ui.sheet||S.ui.notif||['game','result','campus'].includes(S.route))return;
+  NET.onb=true;Object.assign(S.ui.campus,{edit:true,q:'',pick:m.school_id||null,year:m.study_year||null,err:null,adding:false});
+  S.ui.sheet={type:'campus'};renderLayer();
+}
 async function loadInfo(){try{applyInfo(await rpc('public_info'));}catch(e){NET.infoErr=errText(e);}softRender();}
 function toGuest(){const keep={lang:S.data.lang,sound:S.data.sound};S.data=Object.assign(DEF(),keep);NET.me=null;save();}
+
+if(LIVE){const go0=go;go=function(r,a){go0(r,a);if(NET.me&&!NET.onb)setTimeout(maybeOnboard,250);};}
 
 /* ---------- partie : lancement, contexte, envoi ---------- */
 const startGameLocal=startGame,makeCtxLocal=makeCtx,finishGameLocal=finishGame;
@@ -277,10 +292,25 @@ if(LIVE){
     frame:a=>{A0.frame(a);upd({frame:a});},
     skin:a=>{A0.skin(a);upd({skin:a});},
     classmate:()=>{S.ui.sheet={type:'pick',purpose:'duel'};S.ui.notif=false;renderLayer();},
-    campusSave:()=>{const c=S.ui.campus,pick=c.pick||S.data.school.id;if(!pick){c.err=L('Select an institution from the list first.','Choisis d’abord un établissement dans la liste.');render();return;}
-      if(!NET.user){toast(L('Sign in to link a school.','Connecte-toi pour lier une école.'));ACT.auth('login');return;}
-      upd({school_id:pick,program:c.program||S.data.school.program},()=>{c.edit=false;c.err=null;invalidate();toast(L('School saved.','École enregistrée.'));render();});},
-    campusRemove:()=>upd({school_id:null},()=>{S.ui.campus.edit=false;invalidate();render();}),
+    campusSave:()=>{const c=S.ui.campus,pick=c.pick||S.data.school.id;
+      if(!NET.user){toast(L('Sign in to save your school.','Connecte-toi pour enregistrer ton école.'));ACT.auth('login');return;}
+      if(c.adding){c.err=L('Finish adding your school first.','Termine d’abord l’ajout de ton école.');campusRefresh();return;}
+      if(!pick){c.err=L('Pick your school in the list, or add it.','Choisis ton école dans la liste, ou ajoute-la.');campusRefresh();return;}
+      if(!c.year){c.err=L('Choose your year of study.','Choisis ton année d’études.');campusRefresh();return;}
+      if(c.busy)return;c.busy=true;
+      rpc('update_profile',{p:{school_id:pick,study_year:c.year}}).then(m=>{applyMe(m);c.edit=false;c.err=null;invalidate();loadInfo();
+        if(S.ui.sheet&&S.ui.sheet.type==='campus'){S.ui.sheet=null;renderLayer();}
+        toast(L(`Saved: ${SCH[pick]?SCH[pick].name:''}, ${yearName(c.year)}.`,`Enregistré : ${SCH[pick]?SCH[pick].name:''}, ${yearName(c.year)}.`));softRender();})
+      .catch(e=>{c.err=errText(e);campusRefresh();}).finally(()=>{c.busy=false;});},
+    campusAddConfirm:async()=>{const c=S.ui.campus,e=newSchoolErr();if(e){c.err=e;campusRefresh();return;}
+      if(!NET.user){toast(L('Sign in to add your school.','Connecte-toi pour ajouter ton école.'));ACT.auth('login');return;}
+      if(c.busy)return;c.busy=true;
+      try{const x=await rpc('add_school',{p_name:c.nn.trim(),p_city:c.nc.trim(),p_country:(c.nco||'France').trim()||'France'});const sc=addSchoolLocal(x);
+        Object.assign(c,{pick:sc.id,adding:false,q:'',err:null});
+        toast(x.existed?L('This school was already there: it’s now selected.','Cette école existait déjà : elle est sélectionnée.'):L('School added: everyone can now pick it. Choose your year and save.','École ajoutée : tout le monde peut la choisir. Choisis ton année et enregistre.'));}
+      catch(err){c.err=errText(err);}
+      finally{c.busy=false;campusRefresh();}},
+    campusRemove:()=>upd({school_id:null},()=>{S.ui.campus.edit=false;invalidate();loadInfo();render();}),
     verifyReset:()=>{S.data.school.status='unverified';render();},
     signout:async()=>{await sb.auth.signOut();toast(L('Signed out.','Déconnecté.'));},
     export:async()=>{try{const d=await rpc('export_my_data');S.ui.sheet={type:'export',text:JSON.stringify(d,null,2)};renderLayer();}catch(e){toast(errText(e));}},
@@ -305,14 +335,14 @@ if(LIVE)document.addEventListener('submit',async e=>{
   const fail=(err,vals)=>{S.ui.sheet=Object.assign(sh||{type:'auth'},{err,vals});renderLayer();};
   const redirect=location.origin+location.pathname;
   if(k==='signup'){
-    const email=F('email'),pw=f.elements.pw.value,user=F('user'),school=F('school'),age=f.elements.age.checked,err={};
+    const email=F('email'),pw=f.elements.pw.value,user=F('user'),school='',age=f.elements.age.checked,err={};
     if(!EMAIL_RE2.test(email))err.email=L('Enter a valid email address.','Saisis une adresse e-mail valide.');
     if(pw.length<8||!/\d/.test(pw))err.pw=L('Use at least 8 characters, including a number.','Au moins 8 caractères, dont un chiffre.');
     if(!/^[A-Za-z0-9._]{3,16}$/.test(user))err.user=L('Use 3–16 letters, numbers, dots or underscores.','3 à 16 lettres, chiffres, points ou tirets bas.');
     if(!age)err.age=L('Please confirm this to continue.','Merci de confirmer pour continuer.');
     if(Object.keys(err).length)return fail(err,{email,user,school,age});
     busy(true);
-    const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:{username:user,avatar:sh&&sh.av!=null?sh.av:0,school:school||null,lang:LANG},emailRedirectTo:redirect}});
+    const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:{username:user,avatar:sh&&sh.av!=null?sh.av:0,lang:LANG},emailRedirectTo:redirect}});
     if(error){busy(false);return fail({form:/registered|exists/i.test(error.message)?L('An account already exists with this email. Sign in instead.','Un compte existe déjà avec cet e-mail. Connecte-toi.'):/password/i.test(error.message)?L('This password is too weak. Pick a longer one.','Ce mot de passe est trop faible. Choisis-en un plus long.'):errText(error)},{email,user,school,age});}
     if(data.session){S.ui.sheet=null;renderLayer();toast(L('Account created.','Compte créé.'));}
     else{S.ui.sheet={type:'auth',tab:'sent',email};renderLayer();}
