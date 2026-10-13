@@ -251,7 +251,7 @@ VIEWS.lobby=()=>{
 
 VIEWS.game=()=>{
   const g=GAME[S.game.id],o=S.game.oppId?DEMO_BY[S.game.oppId]:(S.game.run&&S.game.run.opp?{name:S.game.run.opp.name}:null);
-  return `<div class="gframe" style="--g:${g.col}"><div class="gframe-h"><button class="btn sm" type="button" data-act="quit">${ic('x',16)}${L('Quit','Quitter')}</button><h1>${g.name}</h1><span class="pill ink">${MODES[S.game.mode].n()}</span>${g.id==='sprint'?`<span class="pill">${TRACKS[trackOf(S.game.sk)].name}</span>`:''}${o?`<span class="pill sim">${L('vs','contre')} ${esc(o.name)} · ${L('simulated','simulé')}</span>`:''}<div class="grow"></div></div>
+  return `<div class="gframe" style="--g:${g.col}"><div class="gframe-h"><button class="btn sm" type="button" data-act="quit">${ic('x',16)}${L('Quit','Quitter')}</button><h1>${g.name}</h1><span class="pill ink">${MODES[S.game.mode].n()}</span>${S.game.practice?`<span class="pill warn">${L('Guest · not saved','Invité · non enregistré')}</span>`:''}${g.id==='sprint'?`<span class="pill">${TRACKS[trackOf(S.game.sk)].name}</span>`:''}${o?`<span class="pill sim">${L('vs','contre')} ${esc(o.name)} · ${L('simulated','simulé')}</span>`:''}<div class="grow"></div></div>
   <div class="stage" id="gameMount"></div></div>`;
 };
 

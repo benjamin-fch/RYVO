@@ -76,7 +76,7 @@ function liveFeedHTML(){
 function liveDuelPanel(){
   return `<div class="opp"><span class="avw">${face({col:'#17142A',eyes:3,mouth:0,shape:2},48)}</span><div style="min-width:0;flex:1"><b class="num" style="font-size:16px">${L('A real player, picked by the server','Un vrai joueur, choisi par le serveur')}</b>
     <p class="tiny">${L(`RYVO picks a player close to your rating (${S.data.rating} SR) and replays their best run. If nobody qualifies yet, you face the RYVO bot.`,`RYVO choisit un joueur proche de ta cote (${S.data.rating} SR) et rejoue son meilleur résultat. S’il n’y en a pas encore, tu affrontes le bot RYVO.`)}</p></div></div>
-    ${NET.user?'':`<p class="tiny">${L('Sign in to play duels and move your rating.','Connecte-toi pour jouer des duels et faire bouger ta cote.')}</p>`}`;
+    ${NET.user?'':`<p class="tiny">${L('As a guest you play a practice run with no opponent. Sign in for real duels and to move your rating.','En invité, tu joues une partie d’essai sans adversaire. Connecte-toi pour de vrais duels et faire bouger ta cote.')}</p>`}`;
 }
 function liveOthers(r){
   const s=r.server||{},st=S.data,sc=SCH[st.school.id];
@@ -90,9 +90,13 @@ function liveOthers(r){
 function practiceResult(r){
   const G=GAME[r.g];
   if(r.rejected)return `<div class="stack"><section class="res-hero" style="--rbg:#fff"><span class="outcome">${L('Run rejected','Partie rejetée')}</span><p class="mu" style="max-width:50ch">${L('The server found inconsistent data in this run, so it doesn’t count. If you think this is a mistake, play again normally.','Le serveur a trouvé des données incohérentes dans cette partie : elle ne compte pas. Si c’est une erreur, rejoue normalement.')}</p><div class="res-actions"><button class="btn hot" type="button" data-act="lobby" data-a="${r.g}">${ic('refresh',16)}${L('Back to the game','Retour au jeu')}</button></div></section></div>`;
-  return `<div class="stack"><section class="res-hero" style="--rbg:${G.hex};--rfg:${r.g==='cards'?INK:'#fff'}"><span class="outcome">${L('Practice','Entraînement')}</span><p class="eyebrow">${esc(skName(r.sk))}</p><div class="big">${fmtScore(r.sk,r.score)}</div>
-    <p class="mu" style="max-width:46ch">${L('Not saved: create an account to keep your scores, earn XP and appear in the rankings.','Non enregistré : crée un compte pour garder tes scores, gagner de l’XP et apparaître au classement.')}</p>
-    <div class="res-actions"><button class="btn hot" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button><button class="btn" type="button" data-act="auth" data-a="login">${L('Sign in','Connexion')}</button><button class="btn" type="button" data-act="again">${ic('refresh',16)}${L('Play again','Rejouer')}</button></div></section></div>`;
+  const hero=`<section class="res-hero" style="--rbg:${G.hex};--rfg:${r.g==='cards'?INK:'#fff'}"><span class="outcome">${L('Guest run','Partie invité')}</span><p class="eyebrow">${esc(skName(r.sk))}</p><div class="big">${fmtScore(r.sk,r.score)}</div>`;
+  if(NET.user)return `<div class="stack">${hero}
+    <p class="mu" style="max-width:48ch">${L('You’re signed in. This run was played as a guest so it isn’t saved, but your next one will count: score, XP and rankings.','Tu es connecté. Cette partie a été jouée en invité, elle n’est donc pas enregistrée, mais la prochaine comptera : score, XP et classements.')}</p>
+    <div class="res-actions"><button class="btn hot" type="button" data-act="again">${ic('play',16)}${L('Play again, saved','Rejouer (enregistré)')}</button><button class="btn" type="button" data-act="go" data-a="play">${L('Library','Ludothèque')}</button></div></section></div>`;
+  return `<div class="stack">${hero}
+    <p class="mu" style="max-width:48ch">${L('Not saved. Create an account or sign in so your next runs count for your record, XP and the rankings.','Non enregistré. Crée un compte ou connecte-toi pour que tes prochaines parties comptent pour ton record, ton XP et les classements.')}</p>
+    <div class="res-actions"><button class="btn hot" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button><button class="btn" type="button" data-act="auth" data-a="login">${L('Sign in','Connexion')}</button><button class="btn" type="button" data-act="again">${ic('refresh',16)}${L('Play again as guest','Rejouer en invité')}</button></div></section></div>`;
 }
 function livePendingHTML(s){
   return `<ol class="steps">
@@ -124,7 +128,8 @@ authHTML=function(sh){
   const err=e.form?`<div class="note err">${ic('info')}<span>${esc(e.form)}</span></div>`:'';
   if(tab==='sent')return `<div class="modal-h"><div><h2>${L('Check your inbox','Vérifie ta boîte mail')}</h2><p>${L(`We sent a confirmation link to ${esc(sh.email)}. Open it, then come back here to sign in.`,`On a envoyé un lien de confirmation à ${esc(sh.email)}. Ouvre-le, puis reviens ici pour te connecter.`)}</p></div>${close}</div><button class="btn primary" type="button" data-act="auth" data-a="login">${L('I confirmed, sign in','C’est confirmé, je me connecte')}</button><p class="tiny">${L('Nothing after a few minutes? Check your spam folder.','Rien après quelques minutes ? Regarde dans tes spams.')}</p>`;
   if(tab==='newpw')return `<div class="modal-h"><div><h2>${L('Choose a new password','Choisis un nouveau mot de passe')}</h2></div>${close}</div><form data-form="newpw" class="stack" novalidate><div class="field"><label for="aPw">${L('New password','Nouveau mot de passe')}</label><input class="input" id="aPw" name="pw" type="password" autocomplete="new-password">${e.pw?`<span class="err">${e.pw}</span>`:`<span class="help">${L('At least 8 characters with a number.','Au moins 8 caractères dont un chiffre.')}</span>`}</div>${err}<button class="btn primary" type="submit">${L('Save password','Enregistrer')}</button></form>`;
-  const head=`<div class="modal-h"><div><h2>${tab==='signup'?L('Create your player account','Crée ton compte joueur'):tab==='login'?L('Welcome back','Content de te revoir'):L('Reset your password','Réinitialise ton mot de passe')}</h2></div>${close}</div>${tabs}`;
+  const run=sh.run&&tab!=='recover'?`<div class="note">${ic('trophy')}<span>${L(`You scored <b>${esc(fmtScore(sh.run.sk,sh.run.score))}</b> as a guest. Guest runs aren’t saved: sign in and your next runs will count in the rankings.`,`Tu as fait <b>${esc(fmtScore(sh.run.sk,sh.run.score))}</b> en invité. Les parties invité ne sont pas enregistrées : connecte-toi et tes prochaines parties compteront au classement.`)}</span></div>`:'';
+  const head=`<div class="modal-h"><div><h2>${sh.run&&tab==='signup'?L('Save your next scores','Enregistre tes prochains scores'):tab==='signup'?L('Create your player account','Crée ton compte joueur'):tab==='login'?L('Welcome back','Content de te revoir'):L('Reset your password','Réinitialise ton mot de passe')}</h2></div>${close}</div>${run}${tabs}`;
   if(tab==='recover'){
     if(sh.sent)return head+`<div class="note">${ic('info')}<span>${L('If an account exists for this address, a reset link is on its way.','Si un compte existe avec cette adresse, un lien de réinitialisation arrive.')}</span></div><button class="btn" type="button" data-act="auth" data-a="login">${L('Back to sign in','Retour à la connexion')}</button>`;
     return head+`<form data-form="recover" class="stack" novalidate><div class="field"><label for="aEmail">E-mail</label><input class="input" id="aEmail" name="email" type="email" autocomplete="email" value="${esc(v.email||'')}">${e.email?`<span class="err">${e.email}</span>`:''}</div>${err}<button class="btn primary" type="submit">${L('Send reset link','Envoyer le lien')}</button></form>`;
@@ -189,8 +194,12 @@ if(LIVE){
   startGame=async function(id,mode,oppId,opt={}){
     SFX.init();
     if(!NET.user){
-      if(mode!=='trial'){toast(L('Sign in to play this mode.','Connecte-toi pour jouer ce mode.'));ACT.auth('login');return;}
-      startGameLocal(id,'trial',null,opt);if(S.game)S.game.practice=true;return;
+      /* Invité : on joue tout de suite, en local, sans ticket serveur. Rien n'est enregistré ;
+         la connexion est proposée à la fin de la partie. */
+      const o=Object.assign({},opt,{practice:true,want:mode});
+      if(mode==='daily')o.track=dailyTrack(),o.cat='mix';
+      if(!NET.guestTold){NET.guestTold=true;toast(L('Guest mode: sign in at the end to save your scores.','Mode invité : connecte-toi à la fin pour enregistrer tes scores.'));}
+      startGameLocal(id,'trial',null,o);return;
     }
     if(NET.starting)return;NET.starting=true;
     const Lb=S.ui.lobby,lv=levelInfo(S.data.xp).L;
@@ -216,7 +225,11 @@ if(LIVE){
   finishGame=function(res){
     const g=S.game;
     if(S.ctrl){S.ctrl.destroy();S.ctrl=null;}
-    if(g.practice||!g.run){S.result={practice:true,g:g.id,sk:g.sk,mode:'trial',score:res.score,details:res.details,fresh:false};go('result');return;}
+    if(g.practice||!g.run){
+      S.result={practice:true,g:g.id,sk:g.sk,mode:'trial',want:g.want||'trial',track:g.track,cat:g.cat,score:res.score,details:res.details,fresh:false};go('result');
+      if(!NET.user){S.ui.sheet={type:'auth',tab:'signup',run:{sk:g.sk,score:res.score}};renderLayer();}
+      return;
+    }
     const mount=$('#gameMount');
     const send=async()=>{
       mount.innerHTML=`<div class="empty" style="min-height:240px;justify-content:center"><div class="skel" style="width:60%"></div><b>${L('Checking your score…','Vérification du score…')}</b>${L('The server recalculates it from your run.','Le serveur le recalcule à partir de ta partie.')}</div>`;
@@ -277,7 +290,9 @@ if(LIVE){
       A0.confirmYes();},
     report:(a,el)=>{if(!NET.user){ACT.auth('login');return;}S.ui.sheet={type:'report',id:a,name:el.dataset.n||''};renderLayer();},
     claim:()=>{},
-    again:()=>{const r=S.result;if(!r)return;startGame(r.g,r.practice?'trial':r.mode,null,{track:S.game&&S.game.track,cat:S.game&&S.game.cat});}
+    again:()=>{const r=S.result;if(!r)return;
+      if(r.practice){const m=r.want||'trial';startGame(r.g,m,null,m==='daily'?{}:{track:r.track,cat:r.cat});return;}
+      startGame(r.g,r.mode,null,{track:S.game&&S.game.track,cat:S.game&&S.game.cat});}
   });
 }
 const EMAIL_RE2=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -307,7 +322,7 @@ if(LIVE)document.addEventListener('submit',async e=>{
     if(!EMAIL_RE2.test(email)||!pw)return fail({email:!EMAIL_RE2.test(email)?L('Enter your email.','Saisis ton e-mail.'):'',pw:!pw?L('Enter your password.','Saisis ton mot de passe.'):''},{email});
     busy(true);const {error}=await sb.auth.signInWithPassword({email,password:pw});
     if(error){busy(false);return fail({form:/confirm/i.test(error.message)?L('Confirm your email first (link sent when you signed up).','Confirme d’abord ton e-mail (lien reçu à l’inscription).'):/invalid/i.test(error.message)?L('Wrong email or password.','E-mail ou mot de passe incorrect.'):errText(error)},{email});}
-    S.ui.sheet=null;renderLayer();toast(L('Signed in.','Connecté.'));
+    const hadRun=sh&&sh.run;S.ui.sheet=null;renderLayer();toast(hadRun?L('Signed in. Your next run will be saved.','Connecté. Ta prochaine partie sera enregistrée.'):L('Signed in.','Connecté.'));
   }
   if(k==='recover'){
     const email=F('email');if(!EMAIL_RE2.test(email))return fail({email:L('Enter a valid email address.','Saisis une adresse e-mail valide.')},{email});

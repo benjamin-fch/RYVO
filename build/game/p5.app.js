@@ -38,7 +38,7 @@ function startGame(id,mode,oppId,opt={}){
   let track=opt.track!=null?opt.track:(Lb.game===id?Lb.track:0);if(TRACKS[track].lv>lv)track=0;if(mode==='daily')track=dailyTrack();
   const cat=mode==='daily'?'mix':(opt.cat||(Lb.game===id?Lb.cat:'mix'));
   const sk=id==='sprint'?'sprint@'+track:id;
-  S.game={id,mode,sk,track,cat,oppId:mode==='duel'?oppId:null};
+  S.game={id,mode,sk,track,cat,oppId:mode==='duel'?oppId:null,practice:!!opt.practice,want:opt.want||mode};
   Object.assign(S.ui.lobby,{game:id,mode,oppId:mode==='duel'?oppId:Lb.oppId,track:id==='sprint'&&mode!=='daily'?track:Lb.track,cat:id==='brain'&&mode!=='daily'?cat:Lb.cat});
   go('game');
 }
@@ -144,7 +144,7 @@ const ACT={
   avatar:a=>{S.data.account.avatar=+a;SFX.play('tap');save();render();},
   frame:a=>{S.data.account.frame=a;SFX.play('tap');save();render();},
   skin:a=>{S.data.account.skin=a;SFX.play('tap');save();render();},
-  auth:a=>{const sh=S.ui.sheet&&S.ui.sheet.type==='auth'?S.ui.sheet:{};S.ui.sheet={type:'auth',tab:a,av:sh.av,vals:sh.vals};S.ui.notif=false;renderLayer();},
+  auth:a=>{const sh=S.ui.sheet&&S.ui.sheet.type==='auth'?S.ui.sheet:{};S.ui.sheet={type:'auth',tab:a,av:sh.av,vals:sh.vals,run:sh.run};S.ui.notif=false;renderLayer();},
   authAv:a=>{const sh=S.ui.sheet,f=$('#layer form');if(f)sh.vals={email:f.elements.email.value,user:f.elements.user.value,school:f.elements.school.value};sh.av=+a;renderLayer();},
   signout:()=>{S.data.account.signedIn=false;save();toast(L('Signed out. Your local progress stays on this device.','Déconnecté. Ta progression reste sur cet appareil.'));render();},
   export:()=>{S.ui.sheet={type:'export'};renderLayer();},
