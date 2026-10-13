@@ -182,12 +182,44 @@ create table if not exists public.missions_claimed(
 );
 
 -- ---------- verrouillage : aucun accès direct aux tables ----------
-do $$ declare t text; begin
-  foreach t in array array['schools','profiles','admins','admin_invites','audit_log','settings','games','questions','words','daily_schedule','runs','reports','verifications','campus_managers','sponsors','competitions','invoices','seasons','missions_claimed'] loop
-    execute format('alter table public.%I enable row level security', t);
-    execute format('revoke all on public.%I from anon, authenticated', t);
-  end loop;
-end $$;
+alter table public.schools enable row level security;
+alter table public.profiles enable row level security;
+alter table public.admins enable row level security;
+alter table public.admin_invites enable row level security;
+alter table public.audit_log enable row level security;
+alter table public.settings enable row level security;
+alter table public.games enable row level security;
+alter table public.questions enable row level security;
+alter table public.words enable row level security;
+alter table public.daily_schedule enable row level security;
+alter table public.runs enable row level security;
+alter table public.reports enable row level security;
+alter table public.verifications enable row level security;
+alter table public.campus_managers enable row level security;
+alter table public.sponsors enable row level security;
+alter table public.competitions enable row level security;
+alter table public.invoices enable row level security;
+alter table public.seasons enable row level security;
+alter table public.missions_claimed enable row level security;
+revoke all on public.schools from anon, authenticated;
+revoke all on public.profiles from anon, authenticated;
+revoke all on public.admins from anon, authenticated;
+revoke all on public.admin_invites from anon, authenticated;
+revoke all on public.audit_log from anon, authenticated;
+revoke all on public.settings from anon, authenticated;
+revoke all on public.games from anon, authenticated;
+revoke all on public.questions from anon, authenticated;
+revoke all on public.words from anon, authenticated;
+revoke all on public.daily_schedule from anon, authenticated;
+revoke all on public.runs from anon, authenticated;
+revoke all on public.reports from anon, authenticated;
+revoke all on public.verifications from anon, authenticated;
+revoke all on public.campus_managers from anon, authenticated;
+revoke all on public.sponsors from anon, authenticated;
+revoke all on public.competitions from anon, authenticated;
+revoke all on public.invoices from anon, authenticated;
+revoke all on public.seasons from anon, authenticated;
+revoke all on public.missions_claimed from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
 
 -- ---------- réglages par défaut ----------
