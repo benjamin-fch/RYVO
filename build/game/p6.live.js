@@ -19,6 +19,15 @@ function errText(e){
     unknown_school:['Unknown school.','École inconnue.'],bad_school_name:['Enter the full name of your school, without links.','Écris le nom complet de ton école, sans lien.'],bad_city:['Enter the city of your campus.','Indique la ville de ton campus.'],
     bad_country:['Check the country.','Vérifie le pays.'],bad_year:['Choose your year of study.','Choisis ton année d’études.'],no_domain:['This school has no email domain yet, so it can’t be verified for now.','Cette école n’a pas encore de domaine e-mail : la vérification n’est pas possible pour l’instant.'],bad_target:['You can’t report this player.','Tu ne peux pas signaler ce joueur.'],expired:['This match took too long and expired.','Ce match a expiré.'],bad_run:['This match is already closed.','Ce match est déjà clos.'],
     time_over:['Time’s up.','Temps écoulé.'],not_enough_questions:['Not enough questions yet. Try another game.','Pas encore assez de questions. Essaie un autre jeu.'],not_enough_words:['Not enough words yet. Try another game.','Pas encore assez de mots. Essaie un autre jeu.'],
+    not_enough_gems:['Not enough gems.','Pas assez de gemmes.'],already_owned:['You already have it.','Tu l’as déjà.'],unknown_item:['This item is no longer on sale.','Cet objet n’est plus en vente.'],
+    ad_limit:['That’s all the ads for today. Come back tomorrow.','C’est tout pour les pubs aujourd’hui. Reviens demain.'],ad_too_soon:['Wait a little before the next ad.','Attends un peu avant la prochaine pub.'],
+    bad_league_name:['Give the league a name of 3 to 40 characters, without links.','Donne à la ligue un nom de 3 à 40 caractères, sans lien.'],bad_days:['Choose a valid duration.','Choisis une durée valide.'],
+    league_limit:['You’ve reached the league limit (3 running leagues created, 20 joined).','Tu as atteint la limite (3 ligues en cours créées, 20 rejointes).'],league_full:['This league is full.','Cette ligue est complète.'],
+    league_ended:['This league is over.','Cette ligue est terminée.'],league_not_found:['No league with this code. Check it with the person who shared it.','Aucune ligue avec ce code. Vérifie-le avec la personne qui l’a partagé.'],
+    not_member:['You’re not in this league.','Tu ne fais pas partie de cette ligue.'],owner_cannot_leave:['You created this league: delete it instead of leaving.','Tu as créé cette ligue : supprime-la plutôt que de la quitter.'],
+    plus_only:['Available with League+.','Disponible avec Ligue+.'],forbidden:['Only the league’s creator can do that.','Seul le créateur de la ligue peut faire ça.'],bad_board:['Pick a game.','Choisis un jeu.'],
+    waiver_required:['Tick the box to get your gems right away.','Coche la case pour recevoir tes gemmes tout de suite.'],unknown_pack:['This pack is no longer available.','Ce pack n’est plus disponible.'],
+    server_error:['Payment couldn’t start. Try again in a moment.','Le paiement n’a pas pu démarrer. Réessaie dans un instant.'],
     last_super_admin:['You are the last super admin: hand over the role before deleting your account.','Tu es le dernier super admin : transmets le rôle avant de supprimer ton compte.']};
   for(const k in T)if(m===k||m.startsWith(k))return L(T[k][0],T[k][1]);
   if(/fetch|network|Failed/i.test(m))return L('Connection problem. Check your internet and try again.','Problème de connexion. Vérifie ton internet et réessaie.');
@@ -42,10 +51,10 @@ function softRender(){clearTimeout(_rt);_rt=setTimeout(()=>{
   if(keepId){const n=document.getElementById(keepId);if(n)try{n.focus();}catch(e){}}
   if(!S.ui.sheet&&!S.ui.notif)renderLayer();
 },40);}
-const faceOf=r=>{const p=AV_PRESETS[r.avatar];return p&&!p.premium?p:demoFace(String(r.id||r.name));};
+const faceOf=r=>{const p=AV_PRESETS[r.avatar];return p||demoFace(String(r.id||r.name));};
 function mapBoard(d){
   if(!d)return null;
-  const uid=NET.user&&NET.user.id,mk=x=>({id:x.id,name:x.name,face:faceOf(x),school:x.school,val:Number(x.val),mv:0,pos:x.pos,me:x.id===uid});
+  const uid=NET.user&&NET.user.id,mk=x=>({id:x.id,name:x.name,face:faceOf(x),frame:x.frame,school:x.school,val:Number(x.val),mv:0,pos:x.pos,me:x.id===uid});
   const rows=(d.rows||[]).map(mk),me=d.me?mk(d.me):null;
   return {rows,me,total:d.total,need_school:d.need_school,unsupported:d.unsupported};
 }
@@ -175,6 +184,7 @@ function applyMe(m){
   d.history=(m.runs||[]).map(r=>({g:r.g,sk:r.sk,m:r.m,s:Number(r.s),o:r.o,opp:r.opp,xp:r.xp,dr:r.dr,t:r.t,x:r.x==null?undefined:Number(r.x),w:r.w,st:r.st}));
   d.daily={day:dayKey(),att:Object.fromEntries(GAMES.map(g=>[g.id,Math.max(0,3-((m.daily&&m.daily.used&&m.daily.used[g.id])||0))])),best:Object.fromEntries(Object.entries((m.daily&&m.daily.best)||{}).map(([k,v])=>[k,Number(v)]))};
   d.schoolPts=m.school_pts||0;
+  d.gems=m.gems||0;d.owned=m.owned||[];
   if(m.status==='suspended')toast(errText('suspended:'+m.until));
   checkAch();save();
 }
@@ -188,7 +198,8 @@ function applyInfo(info){
 }
 function addSchoolLocal(x){const s={id:x.id,name:x.name,short:x.short,city:x.city,country:[x.country,x.country],domain:x.domain,col:x.col,members:Number(x.members)||0};
   const i=SCHOOLS.findIndex(y=>y.id===s.id);if(i>=0)SCHOOLS[i]=s;else SCHOOLS.push(s);SCH[s.id]=s;return s;}
-async function loadMe(){if(!NET.user)return;try{applyMe(await rpc('me'));maybeOnboard();}catch(e){toast(errText(e));}softRender();}
+async function loadMe(){if(!NET.user)return;try{applyMe(await rpc('me'));
+  if(NET.pendingLeague&&!(S.ui.sheet&&S.ui.sheet.type==='league'&&S.ui.sheet.prev)){openLeagueInvite(NET.pendingLeague);}else maybeOnboard();}catch(e){toast(errText(e));}softRender();}
 /* Juste après l'inscription (ou tant que ce n'est pas fait) : demander l'école et l'année, une fois par session, avec « Plus tard ». */
 function maybeOnboard(){
   const m=NET.me;if(!m||NET.onb||(m.school_id&&m.study_year))return;
@@ -379,6 +390,159 @@ if(LIVE)document.addEventListener('submit',async e=>{
   }
 },true);
 
+/* ---------- boutique en ligne : achats en gemmes, paiement Stripe, pubs récompensées ---------- */
+const ADS={loaded:false,failed:false};
+function adsLoad(){
+  const c=CFG.ads&&CFG.ads.client;if(!c||ADS.loaded)return;ADS.loaded=true;
+  window.adsbygoogle=window.adsbygoogle||[];window.adBreak=window.adConfig=function(o){window.adsbygoogle.push(o);};
+  const s=document.createElement('script');s.async=true;s.crossOrigin='anonymous';
+  s.src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client='+encodeURIComponent(c);s.setAttribute('data-ad-client',c);
+  if(CFG.ads.test)s.setAttribute('data-adbreak-test','on');s.onerror=()=>{ADS.failed=true;};document.head.appendChild(s);
+  window.adConfig({preloadAdBreaks:'on',sound:'on'});
+}
+async function payError(e){let code='';try{code=(await e.context.json()).error;}catch(_){}return new Error(code||e.message||'server_error');}
+if(LIVE){
+  const A1=Object.assign({},ACT);
+  Object.assign(ACT,{
+    itemBuyYes:async a=>{if(!NET.user){ACT.auth('signup');return;}const it=shopCfg().items.find(i=>i.id===a);if(!it)return;
+      try{applyMe(await rpc('buy_item',{p_item:a}));S.ui.sheet=null;renderLayer();ACT.equip(a);SFX.play('tap');toast(L(`${it.en} unlocked and equipped.`,`${it.fr} débloqué et équipé.`));softRender();}
+      catch(e){toast(errText(e));loadMe();}},
+    packPay:async a=>{const sh=S.ui.sheet,w=document.getElementById('waiver');
+      if(!NET.user){ACT.auth('signup');return;}
+      if(!payReady()){toast(L('Card payment isn’t available yet.','Le paiement par carte n’est pas encore disponible.'));return;}
+      if(!w||!w.checked){sh.err=errText('waiver_required');renderLayer();return;}
+      sh.busy=true;sh.err=null;renderLayer();
+      try{const {data,error}=await sb.functions.invoke('payments/checkout',{body:{pack:a,waiver:true,lang:LANG}});
+        if(error)throw await payError(error);
+        if(!data||!data.url)throw new Error('server_error');
+        location.href=data.url;}
+      catch(e){sh.busy=false;const t=errText(e);sh.err=t===e.message&&!/[ ’]/.test(t)?errText('server_error'):t;renderLayer();}},
+    watchAd:()=>{const a=adState();if(!NET.user){ACT.auth('signup');return;}if(!a.on||!a.left||a.wait)return;
+      adsLoad();if(ADS.failed){toast(L('Ads are blocked in this browser (ad blocker?).','Les pubs sont bloquées sur ce navigateur (bloqueur de pub ?).'));return;}
+      let done=false,viewed=false;const none=()=>toast(L('No ad available right now. Try again later.','Aucune pub disponible pour le moment. Réessaie plus tard.'));
+      const t=setTimeout(()=>{if(!done){done=true;none();}},10000);
+      window.adBreak({type:'reward',name:'gemmes',
+        beforeReward:show=>show(),
+        adDismissed:()=>toast(L('Ad closed before the end: no gems this time.','Pub fermée avant la fin : pas de gemmes cette fois.')),
+        adViewed:()=>{viewed=true;rpc('ad_reward').then(r=>{toast(L(`+${r.reward} gems. Thanks!`,`+${r.reward} gemmes. Merci !`));loadMe();}).catch(e=>toast(errText(e)));},
+        adBreakDone:i=>{clearTimeout(t);if(done)return;done=true;if(!viewed&&!(i&&i.breakStatus==='dismissed'))none();}});},
+    lgOpen:a=>{S.ui.lg.id=a;S.ui.lg.err=null;invalidate('lg:');if(S.route!=='leagues')go('leagues');else render();window.scrollTo(0,0);},
+    lgBack:()=>{S.ui.lg.id=null;invalidate('leagues');render();},
+    lgPlay:a=>{const g=gameOf(a);ACT.lobby(g);if(g==='sprint'){S.ui.lobby.track=trackOf(a);render();}},
+    lgCopy:a=>{const url=leagueLink(a);const done=()=>toast(L('Invite link copied.','Lien d’invitation copié.'));
+      if(navigator.share&&matchMedia('(pointer:coarse)').matches)navigator.share({title:'RYVO',text:L('Join my league on RYVO','Rejoins ma ligue sur RYVO'),url}).catch(()=>{});
+      else if(navigator.clipboard)navigator.clipboard.writeText(url).then(done,()=>prompt('',url));else prompt('',url);},
+    lgAsk:(a,el)=>{S.ui.sheet={type:'league',what:a,id:S.ui.lg.id,user:el&&el.dataset.u,name:el&&el.dataset.n};renderLayer();},
+    lgDo:async()=>{const sh=S.ui.sheet;if(!sh||sh.type!=='league')return;
+      try{
+        if(sh.what==='upgrade'){await rpc('league_upgrade',{p_id:sh.id});toast(L('League+ unlocked.','Ligue+ activée.'));loadMe();}
+        if(sh.what==='delete'){await rpc('delete_league',{p_id:sh.id});S.ui.lg.id=null;toast(L('League deleted.','Ligue supprimée.'));}
+        if(sh.what==='leave'){await rpc('leave_league',{p_id:sh.id});S.ui.lg.id=null;toast(L('You left the league.','Tu as quitté la ligue.'));}
+        if(sh.what==='kick'){await rpc('league_kick',{p_id:sh.id,p_user:sh.user});toast(L('Player removed.','Joueur retiré.'));}
+        if(sh.what==='join'){const l=await rpc('join_league',{p_code:sh.code});NET.pendingLeague=null;S.ui.sheet=null;invalidate('leagues');ACT.lgOpen(l.id);toast(L('Welcome to the league!','Bienvenue dans la ligue !'));return;}
+        S.ui.sheet=null;invalidate('lg');invalidate('leagues');renderLayer();render();
+      }catch(e){sh.err=errText(e);renderLayer();}},
+    lgCol:a=>{rpc('league_update',{p_id:S.ui.lg.id,p_col:a}).then(()=>{invalidate('lg:');render();}).catch(e=>toast(errText(e)));},
+    lgCsv:()=>{const v=NET.cache['lg:'+S.ui.lg.id]&&NET.cache['lg:'+S.ui.lg.id].v;if(!v)return;
+      const q=x=>'"'+String(x).replace(/"/g,'""')+'"',rows=[[L('Position','Position'),L('Player','Joueur'),L('Best','Meilleur score'),L('Runs','Parties')]].concat(v.rows.map(r=>[r.pos||'',r.name,r.val==null?'':fmtScore(v.sk,Number(r.val)),r.runs]));
+      const blob=new Blob(['﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n')],{type:'text/csv'}),u=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=u;a.download='ligue-'+v.code+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+  });
+}
+const leagueLink=code=>location.origin+location.pathname+'?ligue='+encodeURIComponent(code);
+const endsTxt=t=>{const d=t-Date.now();if(d<=0)return L('ended','terminée');const h=Math.round(d/36e5);return h<48?L(`ends in ${h} h`,`fin dans ${h} h`):L(`ends in ${Math.round(h/24)} d`,`fin dans ${Math.round(h/24)} j`);};
+function lgRowHTML(l){
+  return `<button class="lgl" type="button" data-act="lgOpen" data-a="${l.id}"><span class="dotc" style="background:${l.col}"></span><span style="min-width:0;flex:1"><b style="display:block">${esc(l.name)}${l.plus?' <span class="pill now">Ligue+</span>':''}</b>
+    <span class="tiny">${esc(skName(l.sk))} · ${l.members}/${l.max} ${plural(l.members,'player','players','joueur','joueurs')} · ${endsTxt(l.ends)}</span></span>
+    <span class="num" style="font:800 18px/1 var(--f-d)">${l.me&&l.me.pos?'#'+l.me.pos:'–'}</span></button>`;
+}
+function leagueDetailHTML(id){
+  const key='lg:'+id,v=cached(key,()=>rpc('league_board',{p_id:id}));
+  const back=`<button class="btn sm ghost" type="button" data-act="lgBack">${ic('back',16)}${L('My leagues','Mes ligues')}</button>`;
+  if(v===undefined)return back+`<div class="lb" aria-busy="true" style="margin-top:14px">${'<div class="skel"></div>'.repeat(5)}</div>`;
+  if(v===null)return back+`<div class="empty" style="margin-top:14px"><b>${esc(cacheErr(key)||'')}</b></div>`;
+  const ended=v.ends<=Date.now(),uid=NET.user&&NET.user.id,C=shopCfg();
+  const rows=v.rows.map(r=>`<div class="lb-row${r.id===uid?' me':''}${r.pos&&r.pos<=3?' top':''}"><span class="pos">${r.pos||'–'}</span><span class="who">${avP({id:r.id,name:r.name,face:faceOf(r),frame:r.frame},32)}<span class="nm"><b>${esc(r.name)}${r.id===uid?`<em>${L('You','Toi')}</em>`:''}</b><small>${r.runs} ${plural(r.runs,'run','runs','partie','parties')}</small></span></span><span class="val">${r.val==null?'—':fmtScore(v.sk,Number(r.val))}</span>${v.mine&&r.id!==uid?`<button class="rep" type="button" data-act="lgAsk" data-a="kick" data-u="${r.id}" data-n="${esc(r.name)}" aria-label="${L('Remove','Retirer')} ${esc(r.name)}">✕</button>`:'<span></span>'}</div>`).join('');
+  const owner=v.mine?(v.plus?`<section class="card c5"><div class="card-h"><h2>Ligue+</h2><span class="pill now">${L('Active','Active')}</span></div>
+      <p class="tiny">${L(`Up to ${v.max} players and 60 days.`,`Jusqu’à ${v.max} joueurs et 60 jours.`)}</p>
+      <span class="lab">${L('Colour','Couleur')}</span><div class="cols">${['#5B4BFF','#FF6B3D','#3D7BFF','#14B37A','#FF4FA0','#E0A100','#00A6C8','#8B5CF6','#F23F55','#17142A'].map(c=>`<button type="button" data-act="lgCol" data-a="${c}" aria-pressed="${v.col===c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div>
+      <form data-form="lgDays" class="row" novalidate style="align-items:flex-end;margin-top:10px"><div class="field" style="flex:1"><label for="lgD">${L('Total duration','Durée totale')}</label><select class="input" id="lgD" name="days">${[7,14,21,30,45,60].map(d=>`<option value="${d}" ${Math.round((v.ends-v.starts)/864e5)===d?'selected':''}>${d} ${L('days','jours')}</option>`).join('')}</select></div><button class="btn sm" type="submit">${L('Save','Enregistrer')}</button></form>
+      <button class="btn sm" type="button" data-act="lgCsv">${ic('download',15)}${L('Export results (CSV)','Exporter les résultats (CSV)')}</button></section>`
+    :`<section class="card pop c5"><div class="card-h"><h2>${L('Upgrade to League+','Passe en Ligue+')}</h2></div><ul class="list">${[L('Up to 200 players (instead of 20)','Jusqu’à 200 joueurs (au lieu de 20)'),L('Up to 60 days (instead of 14)','Jusqu’à 60 jours (au lieu de 14)'),L('League colour and results export','Couleur de la ligue et export des résultats')].map(x=>`<li>${ic('check',16)}<span>${x}</span></li>`).join('')}</ul>
+      <button class="btn hot" type="button" data-act="lgAsk" data-a="upgrade" ${ended?'disabled':''}>${ic('gem',16)}${L(`Unlock for ${gemTxt(C.league_plus)}`,`Débloquer pour ${gemTxt(C.league_plus)}`)}</button></section>`):'';
+  return `${back}<div class="lg-head" style="background:${v.col};margin-top:12px"><div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><p class="eyebrow" style="color:rgba(255,255,255,.8)">${esc(skName(v.sk))}${v.plus?' · Ligue+':''}</p><h2 style="font-size:26px;overflow-wrap:anywhere">${esc(v.name)}</h2>
+      <p class="tiny">${L('By','Par')} ${esc(v.owner)} · ${v.members}/${v.max} ${plural(v.members,'player','players','joueur','joueurs')} · ${dateLabel(v.starts)} → ${dateLabel(v.ends)} · ${endsTxt(v.ends)}</p></div>
+      <div style="text-align:right"><span class="tiny" style="display:block;margin-bottom:6px">${L('Invite code','Code d’invitation')}</span><span class="code">${esc(v.code)}</span></div></div>
+    <div class="row" style="margin-top:14px"><button class="btn hot" type="button" data-act="lgPlay" data-a="${v.sk}" ${ended?'disabled':''}>${ic('play',16)}${L('Play','Jouer')}</button><button class="btn" type="button" data-act="lgCopy" data-a="${esc(v.code)}">${ic('share',16)}${L('Invite','Inviter')}</button></div></div>
+  <div class="grid" style="margin-top:16px">
+    <section class="card ${v.mine?'c7':'c12'}"><div class="card-h"><h2>${L('Standings','Classement')}</h2><span class="tiny">${ended?L('Final','Final'):L('Live','En direct')}</span></div>
+      <div class="lb">${rows}</div>
+      <p class="tiny">${L('Every run you finish on this game counts (practice, daily, duel, School Cup) between the start and the end. Scores are checked by the server.','Toutes tes parties sur ce jeu comptent (entraînement, défi du jour, duel, Coupe) entre le début et la fin. Les scores sont vérifiés par le serveur.')}</p>
+      <div class="row">${v.mine?`<button class="btn sm ghost" type="button" data-act="lgAsk" data-a="delete" style="color:var(--bad)">${L('Delete the league','Supprimer la ligue')}</button>`:`<button class="btn sm ghost" type="button" data-act="lgAsk" data-a="leave">${L('Leave the league','Quitter la ligue')}</button>`}</div></section>
+    ${owner}
+  </div>`;
+}
+function leagueSheetHTML(sh,closeBtn){
+  const C=shopCfg(),err=sh.err?`<p class="err" style="color:var(--bad);font-size:13px;font-weight:600">${esc(sh.err)}</p>`:'';
+  if(sh.what==='join'){const p=sh.prev;
+    if(!p)return `<div class="modal-h"><div><h2>${L('League','Ligue')}</h2></div>${closeBtn}</div><div class="skel"></div>`;
+    const info=`<div class="lg-head" style="background:${p.col}"><p class="eyebrow" style="color:rgba(255,255,255,.8)">${esc(skName(p.sk))}</p><h2>${esc(p.name)}</h2><p class="tiny">${L('By','Par')} ${esc(p.owner)} · ${p.members}/${p.max} ${plural(p.members,'player','players','joueur','joueurs')} · ${endsTxt(p.ends)}</p></div>`;
+    if(!NET.user)return `<div class="modal-h"><div><h2>${L('You’re invited to a league','Tu es invité dans une ligue')}</h2></div>${closeBtn}</div>${info}<p>${L('Create an account or sign in to join. Your scores will count in the league.','Crée un compte ou connecte-toi pour la rejoindre. Tes scores compteront dans la ligue.')}</p><div class="row"><button class="btn primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button><button class="btn" type="button" data-act="auth" data-a="login">${L('Sign in','Connexion')}</button></div>`;
+    return `<div class="modal-h"><div><h2>${L('Join this league?','Rejoindre cette ligue ?')}</h2></div>${closeBtn}</div>${info}${err}<button class="btn primary" type="button" data-act="lgDo" ${p.ended||p.members>=p.max?'disabled':''}>${p.ended?L('This league is over','Cette ligue est terminée'):p.members>=p.max?L('This league is full','Cette ligue est complète'):L('Join','Rejoindre')}</button>`;}
+  const T={upgrade:[L('Upgrade to League+?','Passer en Ligue+ ?'),L(`${gemTxt(C.league_plus)} will be taken from your balance (${gemTxt(S.data.gems||0)}).`,`${gemTxt(C.league_plus)} seront retirées de ton solde (${gemTxt(S.data.gems||0)}).`),L('Unlock','Débloquer')],
+    delete:[L('Delete this league?','Supprimer cette ligue ?'),L('The league and its standings disappear for everyone. Players keep their scores.','La ligue et son classement disparaissent pour tout le monde. Les joueurs gardent leurs scores.'),L('Delete','Supprimer')],
+    leave:[L('Leave this league?','Quitter cette ligue ?'),L('You can join again later with the code if there is room.','Tu pourras revenir avec le code s’il reste de la place.'),L('Leave','Quitter')],
+    kick:[L(`Remove ${sh.name}?`,`Retirer ${sh.name} ?`),L('They can join again with the code. Change nothing else.','Il pourra revenir avec le code.'),L('Remove','Retirer')]}[sh.what]||['','',''];
+  const lack=sh.what==='upgrade'&&(S.data.gems||0)<C.league_plus;
+  return `<div class="modal-h"><div><h2>${esc(T[0])}</h2><p>${esc(T[1])}</p></div>${closeBtn}</div>${err}
+    ${lack?`<div class="note">${ic('info')}<span>${L(`You need ${gemTxt(C.league_plus-(S.data.gems||0))} more.`,`Il te manque ${gemTxt(C.league_plus-(S.data.gems||0))}.`)}</span></div><button class="btn primary" type="button" data-act="toPacks">${L('Get gems','Obtenir des gemmes')}</button>`
+      :`<div class="row"><button class="btn ${['delete','kick','leave'].includes(sh.what)?'':'primary'}" type="button" data-act="lgDo" style="${['delete','kick'].includes(sh.what)?'background:var(--bad);color:#fff':''}">${esc(T[2])}</button><button class="btn ghost" type="button" data-act="close">${L('Cancel','Annuler')}</button></div>`}`;
+}
+async function openLeagueInvite(code){
+  S.ui.sheet={type:'league',what:'join',code,prev:null};renderLayer();
+  try{const p=await rpc('league_preview',{p_code:code});
+    if(!p){S.ui.sheet=null;renderLayer();NET.pendingLeague=null;toast(errText('league_not_found'));return;}
+    if(p.member&&p.id){S.ui.sheet=null;NET.pendingLeague=null;ACT.lgOpen(p.id);return;}
+    if(S.ui.sheet&&S.ui.sheet.type==='league'){S.ui.sheet.prev=p;renderLayer();}}
+  catch(e){S.ui.sheet=null;renderLayer();toast(errText(e));}
+}
+if(LIVE){
+  VIEWS.leagues=()=>{
+    const head=`<div class="page-h"><div><p class="eyebrow">${L('Leagues','Ligues')}</p><h1>${L('Your own league','Ta propre ligue')}</h1><p>${L('Create a league for your group: friends, class, club. Share the code, everyone plays when they want, and the standings use your real runs, checked by the server.','Crée une ligue pour ton groupe : amis, promo, asso, club. Partage le code, chacun joue quand il veut, et le classement se fait sur vos vraies parties, vérifiées par le serveur.')}</p></div></div>`;
+    if(!NET.user)return head+`<div class="empty"><b>${L('Sign in to create or join a league','Connecte-toi pour créer ou rejoindre une ligue')}</b>${L('Everyone in a league needs an account so their scores can be checked.','Chaque membre a besoin d’un compte pour que ses scores soient vérifiés.')}<button class="btn sm primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button></div>`;
+    if(S.ui.lg.id)return leagueDetailHTML(S.ui.lg.id);
+    const v=cached('leagues',()=>rpc('my_leagues')),C=shopCfg(),e=S.ui.lg.err;
+    const list=v===undefined?`<div class="lb" aria-busy="true">${'<div class="skel"></div>'.repeat(3)}</div>`:v&&v.length?`<div class="stack">${v.map(lgRowHTML).join('')}</div>`
+      :`<div class="empty"><b>${L('No league yet','Aucune ligue pour l’instant')}</b>${L('Create one and share the code, or join with a code you received.','Crée-en une et partage le code, ou rejoins-en une avec un code reçu.')}</div>`;
+    return head+`<div class="grid">
+      <section class="card c7"><div class="card-h"><h2>${L('My leagues','Mes ligues')}</h2></div>${list}</section>
+      <section class="card pop c5"><div class="card-h"><h2>${L('Join a league','Rejoindre une ligue')}</h2></div>
+        <form data-form="lgJoin" class="row" novalidate style="flex-wrap:nowrap"><input class="input" id="lgCode" name="code" maxlength="6" placeholder="${L('6-character code','Code à 6 caractères')}" autocomplete="off" style="flex:1;min-width:0;text-transform:uppercase;font-family:var(--f-m);letter-spacing:.12em"><button class="btn primary" type="submit">${L('Join','Rejoindre')}</button></form>
+        ${e&&e.join?`<p class="err" style="color:var(--bad);font-size:13px;font-weight:600">${esc(e.join)}</p>`:''}
+        <div class="card-h" style="margin-top:20px"><h2>${L('Create a league','Créer une ligue')}</h2></div>
+        <form data-form="lgCreate" class="stack" novalidate>
+          <div class="field"><label for="lgName">${L('Name','Nom')}</label><input class="input" id="lgName" name="name" maxlength="40" placeholder="${L('e.g. Reflex kings L3','ex. Les rois du réflexe L3')}"></div>
+          <div class="row" style="align-items:flex-end"><div class="field" style="flex:2;min-width:150px"><label for="lgGame">${L('Game','Jeu')}</label><select class="input" id="lgGame" name="sk">${SKS.filter(sk=>GAME[gameOf(sk)]&&GAME[gameOf(sk)].playable).map(sk=>`<option value="${sk}">${esc(skName(sk))}</option>`).join('')}</select></div>
+          <div class="field" style="flex:1;min-width:110px"><label for="lgDays">${L('Duration','Durée')}</label><select class="input" id="lgDays" name="days">${[3,7,14].map(d=>`<option value="${d}" ${d===7?'selected':''}>${d} ${L('days','jours')}</option>`).join('')}</select></div></div>
+          ${e&&e.create?`<p class="err" style="color:var(--bad);font-size:13px;font-weight:600">${esc(e.create)}</p>`:''}
+          <button class="btn hot" type="submit">${ic('flag',16)}${L('Create the league','Créer la ligue')}</button>
+          <p class="tiny">${L(`Free up to 20 players and 14 days. League+ (${gemTxt(C.league_plus)}): 200 players, 60 days, colour and export.`,`Gratuit jusqu’à 20 joueurs et 14 jours. Ligue+ (${gemTxt(C.league_plus)}) : 200 joueurs, 60 jours, couleur et export.`)}</p></form></section>
+    </div>`;
+  };
+  document.addEventListener('submit',async e=>{
+    const f=e.target,k=f.dataset&&f.dataset.form;if(!['lgJoin','lgCreate','lgDays'].includes(k))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const F=n=>f.elements[n]?String(f.elements[n].value).trim():'',btn=f.querySelector('button[type=submit]');if(btn)btn.disabled=true;
+    S.ui.lg.err=null;
+    try{
+      if(k==='lgJoin'){const c=F('code').toUpperCase();if(!/^[A-Z0-9]{6}$/.test(c)){S.ui.lg.err={join:L('A code has 6 letters or digits.','Un code fait 6 lettres ou chiffres.')};render();return;}await openLeagueInvite(c);}
+      if(k==='lgCreate'){const l=await rpc('create_league',{p_name:F('name'),p_sk:F('sk'),p_days:+F('days')});invalidate('leagues');ACT.lgOpen(l.id);toast(L('League created. Share the code!','Ligue créée. Partage le code !'));}
+      if(k==='lgDays'){await rpc('league_update',{p_id:S.ui.lg.id,p_days:+F('days')});invalidate('lg:');toast(L('Duration saved.','Durée enregistrée.'));render();}
+    }catch(err){if(k==='lgDays')toast(errText(err));else{S.ui.lg.err={[k==='lgJoin'?'join':'create']:errText(err)};render();}}
+    finally{if(btn&&document.contains(btn))btn.disabled=false;}
+  },true);
+}
+
 /* ---------- démarrage ---------- */
 if(LIVE){
   const css=document.createElement('style');css.textContent='.rep{border:0;background:none;color:var(--mute);cursor:pointer;font-size:12px;padding:0 4px;margin-left:4px;border-radius:6px}.rep:hover{color:var(--bad);background:var(--bad-soft)}';document.head.appendChild(css);
@@ -387,6 +551,12 @@ if(LIVE){
     if(ev==='PASSWORD_RECOVERY'){S.ui.sheet={type:'auth',tab:'newpw'};renderLayer();}
     if(changed){invalidate();if(u){loadMe();}else{toGuest();softRender();}loadInfo();}
   });
+  /* liens entrants : retour de paiement Stripe, invitation à une ligue */
+  const qs=new URLSearchParams(location.search),buy=qs.get('achat'),inv=qs.get('ligue');
+  if(buy||inv){qs.delete('achat');qs.delete('ligue');history.replaceState(null,'',location.pathname+(qs.toString()?'?'+qs:'')+location.hash);}
+  if(buy==='ok'){setTimeout(()=>toast(L('Payment received. Your gems arrive in a few seconds.','Paiement reçu. Tes gemmes arrivent dans quelques secondes.')),600);[3000,7000,15000].forEach(t=>setTimeout(loadMe,t));go('shop');}
+  if(buy==='annule')setTimeout(()=>toast(L('Payment cancelled. Nothing was charged.','Paiement annulé. Rien n’a été débité.')),600);
+  if(inv&&/^[A-Za-z0-9]{6}$/.test(inv)){NET.pendingLeague=inv.toUpperCase();setTimeout(()=>openLeagueInvite(NET.pendingLeague),700);}
   sb.auth.getSession().then(({data})=>{const u=data&&data.session?data.session.user:null;if(u&&!NET.user){NET.user=u;loadMe();}if(!u&&S.data.uid)toGuest();loadInfo();});
 }
 rollDaily();

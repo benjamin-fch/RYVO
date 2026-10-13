@@ -75,6 +75,7 @@ begin
                  'members',(select count(*) from profiles p where p.school_id = s.id and p.status <> 'banned')) order by s.name),'[]') from schools s),
     'season', (select jsonb_build_object('n', n, 'ends', ms(ends_at)) from seasons where closed_at is null order by n desc limit 1),
     'tracks', setting('tracks'),
+    'shop', shop_public(),
     'comps', (select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'game',game,'format',format,'starts',ms(starts_at),'ends',ms(ends_at),'reward',reward,'school',school_id) order by starts_at),'[]')
               from competitions where not cancelled and ends_at > now() and (visibility = 'public' or school_id is null or school_id = v_sch))
   );
@@ -102,6 +103,9 @@ begin
     'school_id', v_p.school_id, 'program', v_p.program, 'study_year', v_p.study_year,
     'school_lock_until', case when v_p.school_set_at between now() - interval '30 days' and now() - interval '24 hours' then ms(v_p.school_set_at + interval '30 days') end, 'xp', v_p.xp, 'level', level_of(v_p.xp), 'rating', v_p.rating, 'streak', v_p.streak,
     'status', v_p.status, 'until', ms(v_p.suspended_until), 'verified', v_p.verified, 'plus', v_p.plus,
+    'gems', v_p.gems, 'owned', (select coalesce(jsonb_agg(item_id), '[]') from owned_items where user_id = v_uid),
+    'ads_today', (select count(*) from gem_ledger where user_id = v_uid and reason = 'ad' and at >= day_start()),
+    'ad_last', (select ms(max(at)) from gem_ledger where user_id = v_uid and reason = 'ad'),
     'admin', (select role from admins where user_id = v_uid),
     'bests', user_bests(v_uid),
     'runs', (select coalesce(jsonb_agg(x order by x->>'t' desc),'[]') from (
@@ -133,15 +137,15 @@ begin
     update profiles set username = v_u where id = v_uid;
   end if;
   if p ? 'avatar' then
-    if (p->>'avatar')::int not between 0 and 7 then raise exception 'locked_item'; end if;
+    if not ((p->>'avatar')::int between 0 and 7 or owns(v_uid, 'avatar', p->>'avatar')) then raise exception 'locked_item'; end if;
     update profiles set avatar = (p->>'avatar')::int where id = v_uid;
   end if;
   if p ? 'frame' then
-    if (p->>'frame') not in ('basic','gold','brand','candy','mint') or v_lv < (case p->>'frame' when 'gold' then 2 when 'brand' then 3 when 'candy' then 5 when 'mint' then 7 else 1 end) then raise exception 'locked_item'; end if;
+    if not owns(v_uid, 'frame', p->>'frame') and ((p->>'frame') not in ('basic','gold','brand','candy','mint') or v_lv < (case p->>'frame' when 'gold' then 2 when 'brand' then 3 when 'candy' then 5 when 'mint' then 7 else 1 end)) then raise exception 'locked_item'; end if;
     update profiles set frame = p->>'frame' where id = v_uid;
   end if;
   if p ? 'skin' then
-    if (p->>'skin') not in ('violet','coral','mint','berry') or v_lv < (case p->>'skin' when 'coral' then 3 when 'mint' then 5 when 'berry' then 7 else 1 end) then raise exception 'locked_item'; end if;
+    if not owns(v_uid, 'skin', p->>'skin') and ((p->>'skin') not in ('violet','coral','mint','berry') or v_lv < (case p->>'skin' when 'coral' then 3 when 'mint' then 5 when 'berry' then 7 else 1 end)) then raise exception 'locked_item'; end if;
     update profiles set skin = p->>'skin' where id = v_uid;
   end if;
   if p ? 'lang' and p->>'lang' in ('fr','en') then update profiles set lang = p->>'lang' where id = v_uid; end if;
@@ -654,7 +658,11 @@ language sql stable security definer set search_path = public as $$
     'email', (select email from auth.users where id = auth.uid()),
     'runs', (select coalesce(jsonb_agg(jsonb_build_object('game',game,'sk',sk,'mode',mode,'score',score,'status',status,'at',submitted_at) order by submitted_at desc), '[]') from runs where user_id = auth.uid() and submitted_at is not null),
     'reports_sent', (select coalesce(jsonb_agg(jsonb_build_object('type',type,'text',text,'at',created_at)), '[]') from reports where reporter = auth.uid()),
-    'verifications', (select coalesce(jsonb_agg(jsonb_build_object('school',school_id,'email',email,'status',status,'at',created_at)), '[]') from verifications where user_id = auth.uid())
+    'verifications', (select coalesce(jsonb_agg(jsonb_build_object('school',school_id,'email',email,'status',status,'at',created_at)), '[]') from verifications where user_id = auth.uid()),
+    'purchases', (select coalesce(jsonb_agg(jsonb_build_object('pack',pack_id,'gems',gems,'amount_cents',amount_cents,'currency',currency,'status',status,'at',created_at) order by created_at desc), '[]') from purchases where user_id = auth.uid()),
+    'gems', (select coalesce(jsonb_agg(jsonb_build_object('delta',delta,'balance',balance,'reason',reason,'at',at) order by at desc), '[]') from gem_ledger where user_id = auth.uid()),
+    'items', (select coalesce(jsonb_agg(jsonb_build_object('item',item_id,'at',at)), '[]') from owned_items where user_id = auth.uid()),
+    'leagues_owned', (select coalesce(jsonb_agg(jsonb_build_object('name',name,'code',code,'created',created_at)), '[]') from leagues where owner = auth.uid())
   ) $$;
 
 create or replace function public.delete_my_account() returns jsonb

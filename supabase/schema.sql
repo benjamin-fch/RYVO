@@ -283,6 +283,124 @@ begin
 end $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
+
+-- ---------- boutique (gemmes, cosmétiques, achats) — voir 06_shop.sql ----------
+alter table public.profiles add column if not exists gems int not null default 0;
+-- plus d'avatars possibles (les avatars de la boutique ont les numéros 8 à 15)
+alter table public.profiles drop constraint if exists profiles_avatar_check;
+alter table public.profiles add constraint profiles_avatar_check check (avatar between 0 and 15);
+
+create table if not exists public.shop_items(
+  id text primary key,                                  -- ex. 'frame:neon'
+  kind text not null check (kind in ('avatar','frame','skin')),
+  ref text not null,                                    -- valeur côté jeu : numéro d'avatar, cadre ou thème
+  name_fr text not null, name_en text not null,
+  price int not null check (price between 1 and 100000),
+  active boolean not null default true,
+  sort int not null default 0,
+  unique (kind, ref)
+);
+create table if not exists public.owned_items(
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  item_id text not null references public.shop_items(id) on delete cascade,
+  source text not null default 'shop',
+  at timestamptz not null default now(),
+  primary key (user_id, item_id)
+);
+create table if not exists public.gem_packs(
+  id text primary key,
+  gems int not null check (gems > 0),
+  price_cents int not null check (price_cents >= 50),
+  active boolean not null default true,
+  sort int not null default 0
+);
+create table if not exists public.purchases(
+  id uuid primary key default gen_random_uuid(),
+  session_id text not null unique,
+  payment_intent text,
+  user_id uuid references public.profiles(id) on delete set null,
+  pack_id text,
+  gems int not null default 0,
+  amount_cents int not null,
+  currency text not null,
+  status text not null check (status in ('paid','mismatch','refunded')),
+  resolved boolean not null default false,
+  created_at timestamptz not null default now(),
+  refunded_at timestamptz
+);
+create table if not exists public.gem_ledger(
+  id bigserial primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  delta int not null,
+  balance int not null,
+  reason text not null check (reason in ('purchase','item','ad','refund','admin','league')),
+  ref text,
+  at timestamptz not null default now()
+);
+create index if not exists gem_ledger_user on public.gem_ledger (user_id, reason, at desc);
+
+alter table public.shop_items enable row level security;
+alter table public.owned_items enable row level security;
+alter table public.gem_packs enable row level security;
+alter table public.purchases enable row level security;
+alter table public.gem_ledger enable row level security;
+revoke all on public.shop_items from anon, authenticated;
+revoke all on public.owned_items from anon, authenticated;
+revoke all on public.gem_packs from anon, authenticated;
+revoke all on public.purchases from anon, authenticated;
+revoke all on public.gem_ledger from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
+
+-- catalogue de départ (modifiable ensuite depuis la console : prix, actif/inactif)
+insert into public.gem_packs(id, gems, price_cents, sort) values
+  ('s', 100, 99, 1), ('m', 550, 499, 2), ('l', 1200, 999, 3)
+on conflict (id) do nothing;
+insert into public.shop_items(id, kind, ref, name_fr, name_en, price, sort) values
+  ('avatar:8',  'avatar', '8',  'Le Roi',        'The King',      200, 10),
+  ('avatar:9',  'avatar', '9',  'Bandeau',       'Headband',      150, 11),
+  ('avatar:10', 'avatar', '10', 'Chaton',        'Kitty',         200, 12),
+  ('avatar:11', 'avatar', '11', 'Ange',          'Angel',         250, 13),
+  ('avatar:12', 'avatar', '12', 'Roi cool',      'Cool King',     300, 14),
+  ('avatar:13', 'avatar', '13', 'Timide',        'Shy',           150, 15),
+  ('frame:neon',  'frame', 'neon',  'Néon',      'Neon',          300, 20),
+  ('frame:flame', 'frame', 'flame', 'Flamme',    'Flame',         300, 21),
+  ('frame:ice',   'frame', 'ice',   'Glace',     'Ice',           250, 22),
+  ('frame:holo',  'frame', 'holo',  'Holo',      'Holo',          400, 23),
+  ('frame:royal', 'frame', 'royal', 'Royal',     'Royal',         500, 24),
+  ('skin:night',  'skin',  'night', 'Nuit',      'Night',         250, 30),
+  ('skin:ocean',  'skin',  'ocean', 'Océan',     'Ocean',         250, 31),
+  ('skin:grape',  'skin',  'grape', 'Raisin',    'Grape',         250, 32),
+  ('skin:gold',   'skin',  'gold',  'Or',        'Gold',          400, 33)
+on conflict (id) do nothing;
+insert into public.settings(key, value) values
+  ('shop', '{"ad_gems":10,"ad_per_day":5,"ad_gap_s":45,"league_plus_gems":300}')
+on conflict (key) do nothing;
+
+-- ---------- ligues privées — voir 07_leagues.sql ----------
+create table if not exists public.leagues(
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique check (code ~ '^[A-Z0-9]{6}$'),
+  name text not null check (length(name) between 3 and 40),
+  owner uuid not null references public.profiles(id) on delete cascade,
+  sk text not null,
+  starts_at timestamptz not null default now(),
+  ends_at timestamptz not null,
+  plus boolean not null default false,
+  max_members int not null default 20,
+  col text not null default '#5B4BFF',
+  created_at timestamptz not null default now()
+);
+create table if not exists public.league_members(
+  league_id uuid not null references public.leagues(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  primary key (league_id, user_id)
+);
+create index if not exists league_members_user on public.league_members (user_id);
+alter table public.leagues enable row level security;
+alter table public.league_members enable row level security;
+revoke all on public.leagues from anon, authenticated;
+revoke all on public.league_members from anon, authenticated;
 -- =====================================================================
 --  Fonctions côté joueur (appelées par le jeu)
 -- =====================================================================
@@ -360,6 +478,7 @@ begin
                  'members',(select count(*) from profiles p where p.school_id = s.id and p.status <> 'banned')) order by s.name),'[]') from schools s),
     'season', (select jsonb_build_object('n', n, 'ends', ms(ends_at)) from seasons where closed_at is null order by n desc limit 1),
     'tracks', setting('tracks'),
+    'shop', shop_public(),
     'comps', (select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'game',game,'format',format,'starts',ms(starts_at),'ends',ms(ends_at),'reward',reward,'school',school_id) order by starts_at),'[]')
               from competitions where not cancelled and ends_at > now() and (visibility = 'public' or school_id is null or school_id = v_sch))
   );
@@ -387,6 +506,9 @@ begin
     'school_id', v_p.school_id, 'program', v_p.program, 'study_year', v_p.study_year,
     'school_lock_until', case when v_p.school_set_at between now() - interval '30 days' and now() - interval '24 hours' then ms(v_p.school_set_at + interval '30 days') end, 'xp', v_p.xp, 'level', level_of(v_p.xp), 'rating', v_p.rating, 'streak', v_p.streak,
     'status', v_p.status, 'until', ms(v_p.suspended_until), 'verified', v_p.verified, 'plus', v_p.plus,
+    'gems', v_p.gems, 'owned', (select coalesce(jsonb_agg(item_id), '[]') from owned_items where user_id = v_uid),
+    'ads_today', (select count(*) from gem_ledger where user_id = v_uid and reason = 'ad' and at >= day_start()),
+    'ad_last', (select ms(max(at)) from gem_ledger where user_id = v_uid and reason = 'ad'),
     'admin', (select role from admins where user_id = v_uid),
     'bests', user_bests(v_uid),
     'runs', (select coalesce(jsonb_agg(x order by x->>'t' desc),'[]') from (
@@ -418,15 +540,15 @@ begin
     update profiles set username = v_u where id = v_uid;
   end if;
   if p ? 'avatar' then
-    if (p->>'avatar')::int not between 0 and 7 then raise exception 'locked_item'; end if;
+    if not ((p->>'avatar')::int between 0 and 7 or owns(v_uid, 'avatar', p->>'avatar')) then raise exception 'locked_item'; end if;
     update profiles set avatar = (p->>'avatar')::int where id = v_uid;
   end if;
   if p ? 'frame' then
-    if (p->>'frame') not in ('basic','gold','brand','candy','mint') or v_lv < (case p->>'frame' when 'gold' then 2 when 'brand' then 3 when 'candy' then 5 when 'mint' then 7 else 1 end) then raise exception 'locked_item'; end if;
+    if not owns(v_uid, 'frame', p->>'frame') and ((p->>'frame') not in ('basic','gold','brand','candy','mint') or v_lv < (case p->>'frame' when 'gold' then 2 when 'brand' then 3 when 'candy' then 5 when 'mint' then 7 else 1 end)) then raise exception 'locked_item'; end if;
     update profiles set frame = p->>'frame' where id = v_uid;
   end if;
   if p ? 'skin' then
-    if (p->>'skin') not in ('violet','coral','mint','berry') or v_lv < (case p->>'skin' when 'coral' then 3 when 'mint' then 5 when 'berry' then 7 else 1 end) then raise exception 'locked_item'; end if;
+    if not owns(v_uid, 'skin', p->>'skin') and ((p->>'skin') not in ('violet','coral','mint','berry') or v_lv < (case p->>'skin' when 'coral' then 3 when 'mint' then 5 when 'berry' then 7 else 1 end)) then raise exception 'locked_item'; end if;
     update profiles set skin = p->>'skin' where id = v_uid;
   end if;
   if p ? 'lang' and p->>'lang' in ('fr','en') then update profiles set lang = p->>'lang' where id = v_uid; end if;
@@ -939,7 +1061,11 @@ language sql stable security definer set search_path = public as $$
     'email', (select email from auth.users where id = auth.uid()),
     'runs', (select coalesce(jsonb_agg(jsonb_build_object('game',game,'sk',sk,'mode',mode,'score',score,'status',status,'at',submitted_at) order by submitted_at desc), '[]') from runs where user_id = auth.uid() and submitted_at is not null),
     'reports_sent', (select coalesce(jsonb_agg(jsonb_build_object('type',type,'text',text,'at',created_at)), '[]') from reports where reporter = auth.uid()),
-    'verifications', (select coalesce(jsonb_agg(jsonb_build_object('school',school_id,'email',email,'status',status,'at',created_at)), '[]') from verifications where user_id = auth.uid())
+    'verifications', (select coalesce(jsonb_agg(jsonb_build_object('school',school_id,'email',email,'status',status,'at',created_at)), '[]') from verifications where user_id = auth.uid()),
+    'purchases', (select coalesce(jsonb_agg(jsonb_build_object('pack',pack_id,'gems',gems,'amount_cents',amount_cents,'currency',currency,'status',status,'at',created_at) order by created_at desc), '[]') from purchases where user_id = auth.uid()),
+    'gems', (select coalesce(jsonb_agg(jsonb_build_object('delta',delta,'balance',balance,'reason',reason,'at',at) order by at desc), '[]') from gem_ledger where user_id = auth.uid()),
+    'items', (select coalesce(jsonb_agg(jsonb_build_object('item',item_id,'at',at)), '[]') from owned_items where user_id = auth.uid()),
+    'leagues_owned', (select coalesce(jsonb_agg(jsonb_build_object('name',name,'code',code,'created',created_at)), '[]') from leagues where owner = auth.uid())
   ) $$;
 
 create or replace function public.delete_my_account() returns jsonb
@@ -1021,7 +1147,8 @@ begin
     'reports', (select count(*) from reports where status = 'open'),
     'flags', (select count(*) from runs where status = 'flagged'),
     'verifs', (select count(*) from verifications where status = 'pending'),
-    'late', (select count(*) from invoices where status = 'late' or (status = 'pending' and due < current_date)),
+    'late', 0,
+    'shop', (select count(*) from purchases where status = 'mismatch' and not resolved),
     'drafts', (select count(*) from questions where status = 'draft'));
 end $$;
 
@@ -1035,8 +1162,8 @@ begin
     'active7', (select count(*) from profiles where last_seen > now() - interval '7 days'),
     'active30', (select count(*) from profiles where last_seen > now() - interval '30 days'),
     'verified', (select count(*) from profiles where verified),
-    'plus', (select count(*) from profiles where plus),
-    'plus_price', (setting('business')->>'plus_price')::numeric,
+    'shop_month', (select coalesce(sum(amount_cents),0) from purchases where status = 'paid' and created_at >= month_start()),
+    'buyers', (select count(distinct user_id) from purchases where status = 'paid'),
     'counts', admin_counts(),
     'series', (select jsonb_agg(jsonb_build_array(ms(d), coalesce(n,0)) order by d) from (
         select gs::timestamptz d, (select count(distinct user_id) from runs r where r.submitted_at >= gs and r.submitted_at < gs + interval '1 day') n
@@ -1050,7 +1177,7 @@ create or replace function public.admin_player_row(p profiles) returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object('id', p.id, 'name', p.username, 'school', p.school_id, 'program', p.program, 'year', p.study_year, 'level', level_of(p.xp), 'xp', p.xp, 'rating', p.rating,
     'matches', (select count(*) from runs r where r.user_id = p.id and r.submitted_at is not null),
-    'joined', ms(p.created_at), 'last', ms(p.last_seen), 'status', p.status, 'until', ms(p.suspended_until), 'verified', p.verified, 'plus', p.plus,
+    'joined', ms(p.created_at), 'last', ms(p.last_seen), 'status', p.status, 'until', ms(p.suspended_until), 'verified', p.verified, 'plus', p.plus, 'gems', p.gems,
     'mail', mask_email((select email from auth.users u where u.id = p.id)),
     'reports', (select count(*) from reports r where r.target = p.id and r.status = 'open'), 'notes', p.notes) $$;
 
@@ -1805,6 +1932,381 @@ insert into public.words(lang,word,cat) values
   ('en','AIRPLANE',$q$Transport$q$)
 on conflict do nothing;
 -- =====================================================================
+--  Boutique : gemmes, cosmétiques, achats par carte (Stripe), pubs récompensées
+--  Règle d'or : tout ce qui s'achète est esthétique. Rien ne change un score,
+--  un chrono, un nombre d'essais ou la cote.
+-- =====================================================================
+
+-- ---------- outils internes (jamais appelables depuis le site) ----------
+create or replace function public.gem_move(p_uid uuid, p_delta int, p_reason text, p_ref text default null, p_allow_negative boolean default false) returns int
+language plpgsql security definer set search_path = public as $$
+declare v_bal int;
+begin
+  update profiles set gems = gems + p_delta where id = p_uid returning gems into v_bal;
+  if v_bal is null then raise exception 'no_profile'; end if;
+  if p_delta < 0 and v_bal < 0 and not p_allow_negative then raise exception 'not_enough_gems'; end if;
+  insert into gem_ledger(user_id, delta, balance, reason, ref) values (p_uid, p_delta, v_bal, p_reason, p_ref);
+  return v_bal;
+end $$;
+
+create or replace function public.owns(p_uid uuid, p_kind text, p_ref text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists(select 1 from owned_items o join shop_items i on i.id = o.item_id where o.user_id = p_uid and i.kind = p_kind and i.ref = p_ref) $$;
+
+create or replace function public.shop_public() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'items', (select coalesce(jsonb_agg(jsonb_build_object('id',id,'kind',kind,'ref',ref,'fr',name_fr,'en',name_en,'price',price) order by sort, id), '[]') from shop_items where active),
+    'packs', (select coalesce(jsonb_agg(jsonb_build_object('id',id,'gems',gems,'cents',price_cents) order by sort, id), '[]') from gem_packs where active),
+    'ad_gems', (setting('shop')->>'ad_gems')::int, 'ad_per_day', (setting('shop')->>'ad_per_day')::int, 'ad_gap_s', (setting('shop')->>'ad_gap_s')::int,
+    'league_plus', (setting('shop')->>'league_plus_gems')::int) $$;
+
+-- ---------- joueur ----------
+create or replace function public.buy_item(p_item text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_i shop_items;
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  perform ensure_active(v_uid);
+  select * into v_i from shop_items where id = p_item and active;
+  if v_i.id is null then raise exception 'unknown_item'; end if;
+  if exists(select 1 from owned_items where user_id = v_uid and item_id = v_i.id) then raise exception 'already_owned'; end if;
+  perform gem_move(v_uid, -v_i.price, 'item', v_i.id);
+  insert into owned_items(user_id, item_id) values (v_uid, v_i.id);
+  return me();
+end $$;
+
+-- Pub récompensée : on ne peut pas prouver côté serveur qu'une pub a été vue (limite de toutes
+-- les pubs web). D'où : récompense uniquement en gemmes (cosmétiques), plafond par jour et délai minimum.
+create or replace function public.ad_reward() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_cfg jsonb := setting('shop'); v_n int; v_last timestamptz; v_bal int;
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  perform ensure_active(v_uid);
+  perform 1 from profiles where id = v_uid for update;   -- une seule récompense à la fois par joueur
+  select count(*), max(at) into v_n, v_last from gem_ledger where user_id = v_uid and reason = 'ad' and at >= day_start();
+  if v_n >= (v_cfg->>'ad_per_day')::int then raise exception 'ad_limit'; end if;
+  if v_last > now() - make_interval(secs => (v_cfg->>'ad_gap_s')::int) then raise exception 'ad_too_soon'; end if;
+  v_bal := gem_move(v_uid, (v_cfg->>'ad_gems')::int, 'ad');
+  return jsonb_build_object('gems', v_bal, 'reward', (v_cfg->>'ad_gems')::int, 'left', (v_cfg->>'ad_per_day')::int - v_n - 1);
+end $$;
+
+-- ---------- paiement : appelé uniquement par la fonction Stripe (clé service, côté serveur) ----------
+create or replace function public.shop_pack(p_id text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', id, 'gems', gems, 'cents', price_cents) from gem_packs where id = p_id and active $$;
+
+create or replace function public.credit_purchase(p_session text, p_user uuid, p_pack text, p_amount int, p_currency text, p_intent text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_k gem_packs; v_id uuid; v_bal int;
+begin
+  if exists(select 1 from purchases where session_id = p_session) then return jsonb_build_object('ok', true, 'duplicate', true); end if;
+  select * into v_k from gem_packs where id = p_pack;
+  if v_k.id is null or v_k.price_cents <> p_amount or lower(p_currency) <> 'eur' or not exists(select 1 from profiles where id = p_user) then
+    -- montant inattendu (prix modifié entre-temps, code promo…) : rien n'est crédité, l'équipe tranche depuis la console
+    insert into purchases(session_id, payment_intent, user_id, pack_id, gems, amount_cents, currency, status)
+    values (p_session, p_intent, (select id from profiles where id = p_user), p_pack, 0, p_amount, lower(p_currency), 'mismatch')
+    on conflict (session_id) do nothing;
+    return jsonb_build_object('ok', false, 'mismatch', true);
+  end if;
+  insert into purchases(session_id, payment_intent, user_id, pack_id, gems, amount_cents, currency, status)
+  values (p_session, p_intent, p_user, v_k.id, v_k.gems, p_amount, lower(p_currency), 'paid')
+  on conflict (session_id) do nothing returning id into v_id;
+  if v_id is null then return jsonb_build_object('ok', true, 'duplicate', true); end if;
+  v_bal := gem_move(p_user, v_k.gems, 'purchase', p_session);
+  return jsonb_build_object('ok', true, 'gems', v_k.gems, 'balance', v_bal);
+end $$;
+
+create or replace function public.refund_purchase(p_intent text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_p purchases;
+begin
+  update purchases set status = 'refunded', refunded_at = now() where payment_intent = p_intent and status = 'paid' returning * into v_p;
+  if v_p.id is null then return jsonb_build_object('ok', true, 'nothing', true); end if;
+  if v_p.user_id is not null and v_p.gems > 0 then perform gem_move(v_p.user_id, -v_p.gems, 'refund', v_p.session_id, true); end if;
+  return jsonb_build_object('ok', true, 'removed', v_p.gems);
+end $$;
+
+-- ---------- console ----------
+create or replace function public.admin_shop() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform admin_require('partner');
+  return jsonb_build_object(
+    'kpi', jsonb_build_object(
+      'month_cents', (select coalesce(sum(amount_cents),0) from purchases where status = 'paid' and created_at >= month_start()),
+      'total_cents', (select coalesce(sum(amount_cents),0) from purchases where status = 'paid'),
+      'buyers', (select count(distinct user_id) from purchases where status = 'paid'),
+      'orders', (select count(*) from purchases where status = 'paid'),
+      'refunds', (select count(*) from purchases where status = 'refunded'),
+      'gems_out', (select coalesce(sum(gems),0) from profiles),
+      'items_sold', (select count(*) from owned_items),
+      'ads_today', (select count(*) from gem_ledger where reason = 'ad' and at >= day_start()),
+      'ads_7d', (select count(*) from gem_ledger where reason = 'ad' and at >= now() - interval '7 days'),
+      'leagues_plus', (select count(*) from gem_ledger where reason = 'league')),
+    'months', (select coalesce(jsonb_agg(jsonb_build_object('m', ms(m), 'cents', (select coalesce(sum(amount_cents),0) from purchases where status = 'paid' and created_at >= m and created_at < m + interval '1 month')) order by m), '[]')
+      from generate_series(date_trunc('month', now()) - interval '5 months', date_trunc('month', now()), interval '1 month') m),
+    'purchases', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'player', jsonb_build_object('id', pr.id, 'name', pr.username), 'pack', p.pack_id, 'gems', p.gems, 'cents', p.amount_cents,
+        'cur', p.currency, 'status', p.status, 'resolved', p.resolved, 't', ms(p.created_at)) order by p.created_at desc), '[]')
+      from (select * from purchases order by created_at desc limit 60) p left join profiles pr on pr.id = p.user_id),
+    'items', (select coalesce(jsonb_agg(jsonb_build_object('id', i.id, 'kind', i.kind, 'ref', i.ref, 'fr', i.name_fr, 'price', i.price, 'active', i.active,
+        'owners', (select count(*) from owned_items o where o.item_id = i.id)) order by i.sort, i.id), '[]') from shop_items i),
+    'packs', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'gems', gems, 'cents', price_cents, 'active', active) order by sort, id), '[]') from gem_packs),
+    'settings', setting('shop'));
+end $$;
+
+create or replace function public.admin_save_item(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_i shop_items;
+begin
+  perform admin_require('partner');
+  select * into v_i from shop_items where id = p->>'id'; if v_i.id is null then raise exception 'not_found'; end if;
+  if (p->>'price')::int not between 1 and 100000 then raise exception 'bad_price'; end if;
+  update shop_items set price = (p->>'price')::int, active = coalesce((p->>'active')::boolean, active) where id = v_i.id;
+  perform audit('a modifié l’article', v_i.name_fr, (p->>'price') || ' gemmes' || case when (p->>'active')::boolean is false then ' · retiré de la vente' else '' end);
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.admin_save_pack(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_k gem_packs;
+begin
+  perform admin_require('super');
+  select * into v_k from gem_packs where id = p->>'id'; if v_k.id is null then raise exception 'not_found'; end if;
+  if (p->>'gems')::int not between 1 and 100000 or (p->>'cents')::int not between 50 and 100000 then raise exception 'bad_price'; end if;
+  update gem_packs set gems = (p->>'gems')::int, price_cents = (p->>'cents')::int, active = coalesce((p->>'active')::boolean, active) where id = v_k.id;
+  perform audit('a modifié le pack de gemmes', v_k.id, (p->>'gems') || ' gemmes pour ' || to_char((p->>'cents')::int / 100.0, 'FM990D00') || ' €');
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.admin_shop_settings(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v jsonb;
+begin
+  perform admin_require('super');
+  v := jsonb_build_object('ad_gems', (p->>'ad_gems')::int, 'ad_per_day', (p->>'ad_per_day')::int, 'ad_gap_s', (p->>'ad_gap_s')::int, 'league_plus_gems', (p->>'league_plus_gems')::int);
+  if (v->>'ad_gems')::int not between 0 and 100 or (v->>'ad_per_day')::int not between 0 and 20 or (v->>'ad_gap_s')::int not between 15 and 3600
+     or (v->>'league_plus_gems')::int not between 1 and 10000 then raise exception 'bad_threshold'; end if;
+  update settings set value = v where key = 'shop';
+  perform audit('a modifié les réglages boutique', null, v::text);
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.admin_grant_gems(p_user text, p_delta int, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_p profiles; v_bal int;
+begin
+  perform admin_require('super');
+  select * into v_p from profiles where lower(username) = lower(trim(p_user)); if v_p.id is null then raise exception 'not_found'; end if;
+  if p_delta = 0 or abs(p_delta) > 10000 then raise exception 'bad_price'; end if;
+  if length(trim(coalesce(p_reason,''))) < 3 then raise exception 'reason_required'; end if;
+  v_bal := gem_move(v_p.id, p_delta, 'admin', left(trim(p_reason), 120), true);
+  perform audit(case when p_delta > 0 then 'a crédité des gemmes à' else 'a retiré des gemmes à' end, v_p.username, abs(p_delta) || ' · ' || trim(p_reason));
+  return jsonb_build_object('ok', true, 'balance', v_bal);
+end $$;
+
+create or replace function public.admin_purchase_resolve(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+begin
+  perform admin_require('partner');
+  update purchases set resolved = true where id = p_id;
+  perform audit('a traité un paiement à vérifier', p_id::text);
+  return jsonb_build_object('ok', true);
+end $$;
+-- =====================================================================
+--  Ligues privées en libre-service : n'importe quel joueur crée une ligue
+--  pour son groupe (amis, promo, asso, club), partage un code, et le classement
+--  se fait sur les vraies parties vérifiées par le serveur pendant la période.
+--  Gratuit jusqu'à 20 joueurs et 14 jours ; « Ligue+ » (payée en gemmes) : 200 joueurs, 60 jours, couleur.
+-- =====================================================================
+
+create or replace function public.league_sk_ok(p_sk text) returns boolean language sql immutable as $$
+  select p_sk in ('reflex','brain','cards','stack','grid','words','aim','sprint@0','sprint@1','sprint@2') $$;
+create or replace function public.league_cols() returns text[] language sql immutable as $$
+  select array['#5B4BFF','#FF6B3D','#3D7BFF','#14B37A','#FF4FA0','#E0A100','#00A6C8','#8B5CF6','#F23F55','#17142A'] $$;
+create or replace function public.clean_title(t text) returns text language sql immutable as $$ select regexp_replace(trim(coalesce(t,'')), '\s+', ' ', 'g') $$;
+
+-- meilleur score de chaque membre sur le jeu de la ligue, pendant la période
+create or replace function public.league_ranked(p_id uuid) returns table(user_id uuid, username text, avatar int, frame text, val numeric, runs bigint, pos bigint)
+language sql stable security definer set search_path = public as $$
+  with l as (select * from leagues where id = p_id),
+  b as (
+    select m.user_id,
+      (select case when game_lower(split_part(l.sk,'@',1)) then min(r.score) else max(r.score) end from runs r
+        where r.user_id = m.user_id and r.sk = l.sk and r.status = 'valid' and r.submitted_at between l.starts_at and l.ends_at) val,
+      (select count(*) from runs r where r.user_id = m.user_id and r.sk = l.sk and r.status = 'valid' and r.submitted_at between l.starts_at and l.ends_at) runs
+    from league_members m, l where m.league_id = l.id
+  )
+  select b.user_id, p.username, p.avatar, p.frame, b.val, b.runs,
+    case when b.val is null then null else rank() over (order by case when b.val is null then 1 else 0 end,
+      case when game_lower(split_part((select sk from l),'@',1)) then b.val end asc, case when not game_lower(split_part((select sk from l),'@',1)) then b.val end desc) end pos
+  from b join profiles p on p.id = b.user_id where p.status <> 'banned' $$;
+
+create or replace function public.league_json(p_id uuid, p_uid uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', l.id, 'code', l.code, 'name', l.name, 'sk', l.sk, 'starts', ms(l.starts_at), 'ends', ms(l.ends_at), 'plus', l.plus,
+    'max', l.max_members, 'col', l.col, 'owner', (select username from profiles where id = l.owner), 'mine', l.owner = p_uid,
+    'members', (select count(*) from league_members where league_id = l.id),
+    'me', (select jsonb_build_object('pos', pos, 'val', val) from league_ranked(l.id) where user_id = p_uid))
+  from leagues l where l.id = p_id $$;
+
+create or replace function public.create_league(p_name text, p_sk text, p_days int) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_n text := clean_title(p_name); v_code text; v_id uuid; v_a text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  perform ensure_active(v_uid);
+  if length(v_n) not between 3 and 40 or v_n ~* '(https?:|www\.|@|<|>)' then raise exception 'bad_league_name'; end if;
+  if not league_sk_ok(p_sk) then raise exception 'bad_board'; end if;
+  if coalesce(p_days, 0) not between 1 and 14 then raise exception 'bad_days'; end if;
+  if (select count(*) from leagues where owner = v_uid and ends_at > now()) >= 3 then raise exception 'league_limit'; end if;
+  if (select count(*) from leagues where owner = v_uid and created_at > now() - interval '1 day') >= 5 then raise exception 'rate_limited'; end if;
+  loop
+    v_code := (select string_agg(substr(v_a, 1 + floor(random() * length(v_a))::int, 1), '') from generate_series(1, 6));
+    exit when not exists(select 1 from leagues where code = v_code);
+  end loop;
+  insert into leagues(code, name, owner, sk, ends_at, col) values (v_code, v_n, v_uid, p_sk, now() + make_interval(days => p_days), (league_cols())[1 + floor(random() * 9)::int])
+  returning id into v_id;
+  insert into league_members(league_id, user_id) values (v_id, v_uid);
+  return league_json(v_id, v_uid);
+end $$;
+
+-- aperçu avant de rejoindre (lien partagé) : visible sans compte, sans la liste des joueurs
+create or replace function public.league_preview(p_code text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('name', l.name, 'sk', l.sk, 'ends', ms(l.ends_at), 'col', l.col, 'owner', (select username from profiles where id = l.owner),
+    'members', (select count(*) from league_members where league_id = l.id), 'max', l.max_members, 'ended', l.ends_at <= now(),
+    'member', exists(select 1 from league_members where league_id = l.id and user_id = auth.uid()), 'id', case when exists(select 1 from league_members where league_id = l.id and user_id = auth.uid()) then l.id end)
+  from leagues l where l.code = upper(trim(p_code)) $$;
+
+create or replace function public.join_league(p_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_l leagues;
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  perform ensure_active(v_uid);
+  select * into v_l from leagues where code = upper(trim(p_code)) for update;
+  if v_l.id is null then raise exception 'league_not_found'; end if;
+  if exists(select 1 from league_members where league_id = v_l.id and user_id = v_uid) then return league_json(v_l.id, v_uid); end if;
+  if v_l.ends_at <= now() then raise exception 'league_ended'; end if;
+  if (select count(*) from league_members where league_id = v_l.id) >= v_l.max_members then raise exception 'league_full'; end if;
+  if (select count(*) from league_members m join leagues l on l.id = m.league_id where m.user_id = v_uid and l.ends_at > now()) >= 20 then raise exception 'league_limit'; end if;
+  insert into league_members(league_id, user_id) values (v_l.id, v_uid);
+  return league_json(v_l.id, v_uid);
+end $$;
+
+create or replace function public.my_leagues() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(league_json(l.id, auth.uid()) order by (l.ends_at > now()) desc, l.ends_at desc), '[]')
+  from leagues l join league_members m on m.league_id = l.id and m.user_id = auth.uid() $$;
+
+create or replace function public.league_board(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  if not exists(select 1 from league_members where league_id = p_id and user_id = v_uid) then raise exception 'not_member'; end if;
+  return league_json(p_id, v_uid) || jsonb_build_object('rows', (select coalesce(jsonb_agg(jsonb_build_object('id', user_id, 'name', username, 'avatar', avatar, 'frame', frame,
+      'val', val, 'runs', runs, 'pos', pos) order by pos nulls last, username), '[]') from league_ranked(p_id)));
+end $$;
+
+create or replace function public.league_update(p_id uuid, p_name text default null, p_days int default null, p_col text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_l leagues; v_n text := clean_title(p_name);
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  perform ensure_active(v_uid);
+  select * into v_l from leagues where id = p_id; if v_l.id is null or v_l.owner <> v_uid then raise exception 'forbidden'; end if;
+  if p_name is not null then
+    if length(v_n) not between 3 and 40 or v_n ~* '(https?:|www\.|@|<|>)' then raise exception 'bad_league_name'; end if;
+    update leagues set name = v_n where id = p_id;
+  end if;
+  if p_days is not null then
+    if p_days not between 1 and (case when v_l.plus then 60 else 14 end) or v_l.starts_at + make_interval(days => p_days) <= now() then raise exception 'bad_days'; end if;
+    update leagues set ends_at = starts_at + make_interval(days => p_days) where id = p_id;
+  end if;
+  if p_col is not null then
+    if not v_l.plus then raise exception 'plus_only'; end if;
+    if not (p_col = any(league_cols())) then raise exception 'bad_fields'; end if;
+    update leagues set col = p_col where id = p_id;
+  end if;
+  return league_json(p_id, v_uid);
+end $$;
+
+create or replace function public.league_upgrade(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_l leagues; v_cost int := (setting('shop')->>'league_plus_gems')::int;
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  perform ensure_active(v_uid);
+  select * into v_l from leagues where id = p_id for update; if v_l.id is null or v_l.owner <> v_uid then raise exception 'forbidden'; end if;
+  if v_l.plus then raise exception 'already_owned'; end if;
+  if v_l.ends_at <= now() then raise exception 'league_ended'; end if;
+  perform gem_move(v_uid, -v_cost, 'league', v_l.id::text);
+  update leagues set plus = true, max_members = 200 where id = p_id;
+  return league_json(p_id, v_uid);
+end $$;
+
+create or replace function public.leave_league(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  if exists(select 1 from leagues where id = p_id and owner = v_uid) then raise exception 'owner_cannot_leave'; end if;
+  delete from league_members where league_id = p_id and user_id = v_uid;
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.league_kick(p_id uuid, p_user uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  if not exists(select 1 from leagues where id = p_id and owner = v_uid) then raise exception 'forbidden'; end if;
+  if p_user = v_uid then raise exception 'owner_cannot_leave'; end if;
+  delete from league_members where league_id = p_id and user_id = p_user;
+  return league_board(p_id);
+end $$;
+
+create or replace function public.delete_league(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  delete from leagues where id = p_id and owner = v_uid;
+  if not found then raise exception 'forbidden'; end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ---------- console : modération des ligues (noms) ----------
+create or replace function public.admin_leagues(p_q text default '') returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform admin_require('mod');
+  return jsonb_build_object(
+    'active', (select count(*) from leagues where ends_at > now()),
+    'plus', (select count(*) from leagues where plus),
+    'members', (select count(*) from league_members m join leagues l on l.id = m.league_id where l.ends_at > now()),
+    'rows', (select coalesce(jsonb_agg(x order by (x->>'t')::bigint desc), '[]') from (
+      select jsonb_build_object('id', l.id, 'code', l.code, 'name', l.name, 'sk', l.sk, 'owner', jsonb_build_object('id', p.id, 'name', p.username),
+        'members', (select count(*) from league_members where league_id = l.id), 'max', l.max_members, 'plus', l.plus, 't', ms(l.created_at), 'ends', ms(l.ends_at)) x
+      from leagues l join profiles p on p.id = l.owner
+      where coalesce(p_q,'') = '' or l.name ilike '%' || p_q || '%' or l.code = upper(p_q) or p.username ilike '%' || p_q || '%'
+      order by l.created_at desc limit 200) z));
+end $$;
+
+create or replace function public.admin_delete_league(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_l leagues;
+begin
+  perform admin_require('mod');
+  delete from leagues where id = p_id returning * into v_l;
+  if v_l.id is null then raise exception 'not_found'; end if;
+  perform audit('a supprimé la ligue', v_l.name, v_l.code);
+  return jsonb_build_object('ok', true);
+end $$;
+-- =====================================================================
 --  Droits d'exécution : seules ces fonctions sont accessibles depuis le web.
 -- =====================================================================
 revoke execute on all functions in schema public from public, anon, authenticated;
@@ -1828,3 +2330,14 @@ grant execute on function public.admin_me(), public.admin_counts(), public.admin
   public.admin_schools(), public.admin_save_school(jsonb), public.admin_merge_school(text,text), public.admin_delete_school(text), public.admin_verif_action(uuid,text), public.admin_manager(text,jsonb),
   public.admin_business(), public.admin_invoice(text,jsonb), public.admin_sponsor(jsonb),
   public.admin_team(), public.admin_team_action(text,jsonb), public.admin_log(text,int) to authenticated;
+
+-- boutique et ligues (joueurs connectés)
+grant execute on function public.buy_item(text), public.ad_reward(), public.create_league(text,text,int), public.join_league(text), public.my_leagues(),
+  public.league_board(uuid), public.league_update(uuid,text,int,text), public.league_upgrade(uuid), public.leave_league(uuid), public.league_kick(uuid,uuid),
+  public.delete_league(uuid) to authenticated;
+grant execute on function public.league_preview(text) to anon, authenticated;
+-- console
+grant execute on function public.admin_shop(), public.admin_save_item(jsonb), public.admin_save_pack(jsonb), public.admin_shop_settings(jsonb),
+  public.admin_grant_gems(text,int,text), public.admin_purchase_resolve(uuid), public.admin_leagues(text), public.admin_delete_league(uuid) to authenticated;
+-- paiements : uniquement la fonction serveur Stripe, avec la clé service (jamais le site)
+grant execute on function public.shop_pack(text), public.credit_purchase(text,uuid,text,int,text,text), public.refund_purchase(text) to service_role;

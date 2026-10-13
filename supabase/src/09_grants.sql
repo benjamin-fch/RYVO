@@ -22,3 +22,14 @@ grant execute on function public.admin_me(), public.admin_counts(), public.admin
   public.admin_schools(), public.admin_save_school(jsonb), public.admin_merge_school(text,text), public.admin_delete_school(text), public.admin_verif_action(uuid,text), public.admin_manager(text,jsonb),
   public.admin_business(), public.admin_invoice(text,jsonb), public.admin_sponsor(jsonb),
   public.admin_team(), public.admin_team_action(text,jsonb), public.admin_log(text,int) to authenticated;
+
+-- boutique et ligues (joueurs connectés)
+grant execute on function public.buy_item(text), public.ad_reward(), public.create_league(text,text,int), public.join_league(text), public.my_leagues(),
+  public.league_board(uuid), public.league_update(uuid,text,int,text), public.league_upgrade(uuid), public.leave_league(uuid), public.league_kick(uuid,uuid),
+  public.delete_league(uuid) to authenticated;
+grant execute on function public.league_preview(text) to anon, authenticated;
+-- console
+grant execute on function public.admin_shop(), public.admin_save_item(jsonb), public.admin_save_pack(jsonb), public.admin_shop_settings(jsonb),
+  public.admin_grant_gems(text,int,text), public.admin_purchase_resolve(uuid), public.admin_leagues(text), public.admin_delete_league(uuid) to authenticated;
+-- paiements : uniquement la fonction serveur Stripe, avec la clé service (jamais le site)
+grant execute on function public.shop_pack(text), public.credit_purchase(text,uuid,text,int,text,text), public.refund_purchase(text) to service_role;

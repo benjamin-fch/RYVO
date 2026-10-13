@@ -38,6 +38,11 @@ const ICONS={
   users:'<circle cx="7.5" cy="7" r="3"/><path d="M2 17c.5-3 2.7-5 5.5-5s5 2 5.5 5M13 4.2a3 3 0 0 1 0 5.6M15 12c1.8.6 3 2.4 3.3 5"/>',
   user:'<circle cx="10" cy="6.5" r="3.5"/><path d="M3 18c.8-3.6 3.6-6 7-6s6.2 2.4 7 6"/>',
   gem:'<path d="M5 3h10l3 5-8 9-8-9zM2 8h16M8 3 7 8l3 9 3-9-1-5"/>',
+  flag:'<path d="M4.5 18V2.5M4.5 3.5h10.5l-2.2 3.7 2.2 3.8H4.5"/>',
+  copy:'<rect x="7" y="7" width="10.5" height="10.5" rx="2"/><path d="M4 13V4a1.2 1.2 0 0 1 1.2-1.2H13"/>',
+  tv:'<rect x="2.5" y="4" width="15" height="10.5" rx="2"/><path d="M8.5 7v4.5l3.8-2.25zM7 17.5h6"/>',
+  bag:'<path d="M4 7h12l-1 10.5H5zM7 7V5.5a3 3 0 0 1 6 0V7"/>',
+  download:'<path d="M10 3v10M6 9.2l4 4 4-4M4 17h12"/>',
   building:'<path d="M3 18V5l7-3 7 3v13M1 18h18M7 8h1M12 8h1M7 11h1M12 11h1M8.5 18v-4h3v4"/>',
   code:'<path d="M7 5 2 10l5 5M13 5l5 5-5 5M11.5 3l-3 14"/>',
   bell:'<path d="M5 8a5 5 0 0 1 10 0c0 5 2 6 2 6H3s2-1 2-6M8 17a2 2 0 0 0 4 0"/>',
@@ -296,10 +301,15 @@ function face(p,size=36){
     `<path d="M10 17h7" stroke="${ln}" stroke-width="2.4" stroke-linecap="round"/><circle cx="26" cy="17" r="3" fill="${ln}"/>`,
     `<rect x="9" y="13" width="22" height="7" rx="3.5" fill="${INK}"/><rect x="11" y="14.5" width="7" height="2" rx="1" fill="#fff" opacity=".6"/>`][p.eyes%4];
   const mouth=[`<path d="M14 26q6 6 12 0" fill="none" stroke="${ln}" stroke-width="2.4" stroke-linecap="round"/>`,`<path d="M15 27h10" stroke="${ln}" stroke-width="2.4" stroke-linecap="round"/>`,`<circle cx="20" cy="27.5" r="2.6" fill="${ln}"/>`,`<path d="M13 25h14q-1 6-7 6t-7-6z" fill="#fff" stroke="${ln}" stroke-width="1.8" stroke-linejoin="round"/>`][p.mouth%4];
-  const acc=p.acc===1?`<path d="M11 4l4 5 5-6 5 6 4-5v6H11z" fill="#FFC93C" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`:p.acc===2?`<rect x="3" y="8" width="34" height="5" rx="2.5" fill="#fff" stroke="${INK}" stroke-width="1.5"/>`:'';
-  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.5" y="${p.acc===1?4.5:1.5}" width="37" height="${p.acc===1?34:37}" rx="${rx}" fill="${col}" stroke="${INK}" stroke-width="2.2"/>${eyes}${mouth}${acc}</svg>`;
+  const acc=p.acc===1?`<path d="M11 4l4 5 5-6 5 6 4-5v6H11z" fill="#FFC93C" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`:p.acc===2?`<rect x="3" y="8" width="34" height="5" rx="2.5" fill="#fff" stroke="${INK}" stroke-width="1.5"/>`
+    :p.acc===3?`<path d="M5 9.5 7.5 1.5l7 5.2M35 9.5l-2.5-8-7 5.2" fill="${col}" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.6 4.6 8.4 7.4M32.4 4.6l-.8 2.8" stroke="#FF8FB1" stroke-width="2" stroke-linecap="round"/>`
+    :p.acc===4?`<ellipse cx="20" cy="2.8" rx="9.5" ry="2.2" fill="none" stroke="#FFC93C" stroke-width="2.4"/>`
+    :p.acc===5?`<ellipse cx="8.5" cy="23" rx="3.2" ry="2" fill="#FF8FB1" opacity=".9"/><ellipse cx="31.5" cy="23" rx="3.2" ry="2" fill="#FF8FB1" opacity=".9"/>`:'';
+  const top=p.acc===1||p.acc===3||p.acc===4;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.5" y="${top?4.5:1.5}" width="37" height="${top?34:37}" rx="${rx}" fill="${col}" stroke="${INK}" stroke-width="2.2"/><g transform="translate(0 ${top?1.5:0})">${eyes}${mouth}${top?'':acc}</g>${top?acc:''}</svg>`;
 }
-const AV_PRESETS=[{col:'#5B4BFF',eyes:0,mouth:0,shape:0},{col:'#FFC93C',eyes:1,mouth:3,shape:1},{col:'#14B37A',eyes:0,mouth:2,shape:2},{col:'#FF4FA0',eyes:2,mouth:0,shape:0},{col:'#00A6C8',eyes:3,mouth:1,shape:1},{col:'#FF6B3D',eyes:1,mouth:0,shape:2},{col:'#9BE15D',eyes:0,mouth:3,shape:1},{col:'#8B5CF6',eyes:2,mouth:2,shape:0},{col:'#17142A',eyes:3,mouth:0,shape:2,acc:1,premium:true},{col:'#FF9F1C',eyes:0,mouth:3,shape:0,acc:2,premium:true}];
+const AV_PRESETS=[{col:'#5B4BFF',eyes:0,mouth:0,shape:0},{col:'#FFC93C',eyes:1,mouth:3,shape:1},{col:'#14B37A',eyes:0,mouth:2,shape:2},{col:'#FF4FA0',eyes:2,mouth:0,shape:0},{col:'#00A6C8',eyes:3,mouth:1,shape:1},{col:'#FF6B3D',eyes:1,mouth:0,shape:2},{col:'#9BE15D',eyes:0,mouth:3,shape:1},{col:'#8B5CF6',eyes:2,mouth:2,shape:0},{col:'#17142A',eyes:3,mouth:0,shape:2,acc:1,premium:true},{col:'#FF9F1C',eyes:0,mouth:3,shape:0,acc:2,premium:true},
+  {col:'#F23F55',eyes:0,mouth:3,shape:1,acc:3,premium:true},{col:'#FFFFFF',eyes:2,mouth:0,shape:0,acc:4,premium:true},{col:'#00A6C8',eyes:3,mouth:2,shape:2,acc:1,premium:true},{col:'#9BE15D',eyes:0,mouth:0,shape:1,acc:5,premium:true}];
 function demoFace(id){const h=hashStr(id+'face');return {col:AVC[h%AVC.length],eyes:(h>>>5)%4,mouth:(h>>>9)%4,shape:(h>>>13)%3,acc:(h>>>17)%11===0?2:0};}
 
 /* Demo roster: fictional players, seeded so every page shows the same people. */
@@ -334,8 +344,19 @@ const online=p=>(hashStr(p.id+Math.floor(Date.now()/300000))%3)!==0;
 const LEAGUES=[{n:()=>'Bronze',min:0,c:'#C27A4A'},{n:()=>L('Silver','Argent'),min:1000,c:'#8D93AE'},{n:()=>L('Gold','Or'),min:1200,c:'#E0A100'},{n:()=>L('Platinum','Platine'),min:1400,c:'#14B3A0'},{n:()=>L('Diamond','Diamant'),min:1600,c:'#3D7BFF'}];
 const league=r=>{let x=LEAGUES[0];LEAGUES.forEach(l=>{if(r>=l.min)x=l;});return x;};
 const leagueBadge=r=>{const x=league(r);return `<span class="league"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1l5 3v6l-5 3-5-3V4z" fill="${x.c}" stroke="${INK}" stroke-width="1.3"/></svg>${x.n()}</span>`;};
-const FRAMES=[{id:'basic',n:()=>L('None','Aucun'),lv:1},{id:'gold',n:()=>L('Gold','Or'),lv:2},{id:'brand',n:()=>L('Brand','Marque'),lv:3},{id:'candy',n:()=>'Candy',lv:5},{id:'mint',n:()=>'Mint',lv:7},{id:'holo',n:()=>'Holo',premium:true}];
-const SKINS=[{id:'violet',n:()=>'Violet',lv:1,c:'#5B4BFF'},{id:'coral',n:()=>L('Coral','Corail'),lv:3,c:'#F2542D'},{id:'mint',n:()=>'Mint',lv:5,c:'#0E9F78'},{id:'berry',n:()=>L('Berry','Framboise'),lv:7,c:'#D6336C'}];
+const FRAMES=[{id:'basic',n:()=>L('None','Aucun'),lv:1},{id:'gold',n:()=>L('Gold','Or'),lv:2},{id:'brand',n:()=>L('Brand','Marque'),lv:3},{id:'candy',n:()=>'Candy',lv:5},{id:'mint',n:()=>'Mint',lv:7},{id:'holo',n:()=>'Holo',premium:true},{id:'neon',n:()=>L('Neon','Néon'),premium:true},{id:'flame',n:()=>L('Flame','Flamme'),premium:true},{id:'ice',n:()=>L('Ice','Glace'),premium:true},{id:'royal',n:()=>'Royal',premium:true}];
+const SKINS=[{id:'violet',n:()=>'Violet',lv:1,c:'#5B4BFF'},{id:'coral',n:()=>L('Coral','Corail'),lv:3,c:'#F2542D'},{id:'mint',n:()=>'Mint',lv:5,c:'#0E9F78'},{id:'berry',n:()=>L('Berry','Framboise'),lv:7,c:'#D6336C'},
+  {id:'night',n:()=>L('Night','Nuit'),premium:true,c:'#3B2F99'},{id:'ocean',n:()=>L('Ocean','Océan'),premium:true,c:'#0069A8'},{id:'grape',n:()=>L('Grape','Raisin'),premium:true,c:'#7B2CBF'},{id:'gold',n:()=>L('Gold','Or'),premium:true,c:'#9C6510'}];
+/* Boutique : catalogue de démonstration (en ligne, il vient du serveur et ses prix font foi). */
+const SHOP0={items:[['avatar','8','Le Roi','The King',200],['avatar','9','Bandeau','Headband',150],['avatar','10','Chaton','Kitty',200],['avatar','11','Ange','Angel',250],['avatar','12','Roi cool','Cool King',300],['avatar','13','Timide','Shy',150],
+  ['frame','neon','Néon','Neon',300],['frame','flame','Flamme','Flame',300],['frame','ice','Glace','Ice',250],['frame','holo','Holo','Holo',400],['frame','royal','Royal','Royal',500],
+  ['skin','night','Nuit','Night',250],['skin','ocean','Océan','Ocean',250],['skin','grape','Raisin','Grape',250],['skin','gold','Or','Gold',400]].map(([kind,ref,fr,en,price])=>({id:kind+':'+ref,kind,ref,fr,en,price})),
+  packs:[{id:'s',gems:100,cents:99},{id:'m',gems:550,cents:499},{id:'l',gems:1200,cents:999}],ad_gems:10,ad_per_day:5,ad_gap_s:45,league_plus:300};
+const shopCfg=()=>(LIVE&&typeof NET!=='undefined'&&NET.info&&NET.info.shop)||SHOP0;
+const itemOf=(kind,ref)=>shopCfg().items.find(i=>i.kind===kind&&i.ref===String(ref));
+const ownsItem=(kind,ref)=>(S.data.owned||[]).includes(kind+':'+ref);
+const eur=c=>(c/100).toLocaleString(LOC(),{style:'currency',currency:'EUR'});
+const gemTxt=n=>`${fmt(n)} ${plural(n,'gem','gems','gemme','gemmes')}`;
 
 const ACH=[
   {id:'first',n:()=>L('First Run','Premier essai'),d:()=>L('Finish any match.','Termine un match.'),t:s=>s.history.length>0},
@@ -378,6 +399,7 @@ let STORAGE_OK=true;
 function addDays(n){const d=new Date();d.setHours(18,0,0,0);d.setDate(d.getDate()+n);return d.getTime();}
 const DEF=()=>({v:2,lang:null,sound:true,
   account:{signedIn:false,username:LIVE?'invite':'ace_rookie',avatar:0,frame:'basic',skin:'violet'},
+  gems:0,owned:[],ads:{day:null,n:0,last:0},
   school:{id:LIVE?null:'nbu',program:'bus2',year:LIVE?null:'2',status:'unverified',domain:null},
   xp:0,rating:1000,streak:0,lastDay:null,
   bests:{},ghosts:{},history:[],
@@ -405,7 +427,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S.data));}catch(e){S
 
 const S={route:'home',data:null,game:null,result:null,ctrl:null,
   ui:{lib:{cat:'all',mode:'all',diff:'all',sort:'pop'},rank:{view:'players',scope:'world',board:'rating',loading:false},
-      lobby:{game:null,mode:'trial',oppId:null,track:0,cat:'mix'},sheet:null,notif:false,campus:{edit:false,q:'',pick:null,year:null,err:null,adding:false,nn:'',nc:'',nco:''},
+      lobby:{game:null,mode:'trial',oppId:null,track:0,cat:'mix'},sheet:null,notif:false,campus:{edit:false,q:'',pick:null,year:null,err:null,adding:false,nn:'',nc:'',nco:''},shop:{tab:'avatar'},lg:{id:null,err:null,busy:false},
       admin:{err:null},calc:{mau:20000,conv:2,price:3.99,inst:5,instPrice:2400,spons:4,sponsPrice:1500}}};
 S.data=load();
 /* écoles ajoutées par le joueur en mode démo (en ligne, elles viennent du serveur) */
@@ -418,7 +440,7 @@ function levelInfo(xp){let lv=1,need=200,rem=xp;while(rem>=need){rem-=need;lv++;
 const me=()=>({me:true,id:'me',name:S.data.account.username,school:S.data.school.id});
 function avP(p,size=36,frame){
   if(p.me){const pr=AV_PRESETS[S.data.account.avatar]||AV_PRESETS[0];return `<span class="avw fr-${frame||S.data.account.frame}">${face(pr,size)}</span>`;}
-  return `<span class="avw">${face(p.face||demoFace(p.id),size)}</span>`;
+  return `<span class="avw${p.frame&&p.frame!=='basic'?' fr-'+p.frame:''}">${face(p.face||demoFace(p.id),size)}</span>`;
 }
 const avMe=(s=36)=>avP(me(),s);
 function rollDaily(){const st=S.data,d=dayKey();if(st.daily.day!==d)st.daily={day:d,att:{},best:{}};if(st.missions.day!==d)st.missions={day:d,claimed:[]};}

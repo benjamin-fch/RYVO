@@ -4,9 +4,12 @@ set -e
 cd "$(dirname "$0")/.."
 SB='<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"></script>'
 CSP='<meta http-equiv="Content-Security-Policy" content="default-src '"'"'self'"'"'; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://cdn.jsdelivr.net; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src '"'"'self'"'"' data: blob:; connect-src '"'"'self'"'"' https://*.supabase.co wss://*.supabase.co; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'">'
+# Le jeu autorise en plus les domaines Google des pubs récompensées (chargées seulement si config.js les active)
+ADS='https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.gstatic.com https://*.googletagservices.com https://*.adtrafficquality.google https://fundingchoicesmessages.google.com'
+CSP_GAME='<meta http-equiv="Content-Security-Policy" content="default-src '"'"'self'"'"'; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://cdn.jsdelivr.net '"$ADS"'; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src '"'"'self'"'"' data: blob: https:; connect-src '"'"'self'"'"' https://*.supabase.co wss://*.supabase.co '"$ADS"'; frame-src '"$ADS"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'">'
 {
   echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
-  echo "$CSP"
+  echo "$CSP_GAME"
   echo '<meta name="description" content="RYVO : mini-jeux compétitifs, duels et classements entre écoles."><meta name="referrer" content="strict-origin-when-cross-origin">'
   cat build/game/p1.css.html
   echo "$SB"
@@ -25,5 +28,5 @@ mkdir -p admin
   cat build/admin/b2.core.js build/admin/b3.live.js build/admin/b4.views.js build/admin/b5.app.js
   echo '</html>'
 } > admin/index.html
-cat supabase/src/01_schema.sql supabase/src/02_player.sql supabase/src/03_admin.sql supabase/src/04_seed.sql supabase/src/05_grants.sql > supabase/schema.sql
+cat supabase/src/01_schema.sql supabase/src/02_player.sql supabase/src/03_admin.sql supabase/src/04_seed.sql supabase/src/06_shop.sql supabase/src/07_leagues.sql supabase/src/09_grants.sql > supabase/schema.sql
 echo "built index.html, admin/index.html, supabase/schema.sql"

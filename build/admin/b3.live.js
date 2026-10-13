@@ -13,7 +13,7 @@ const ERR={forbidden:'Ton rôle ne permet pas cette action.',mfa_required:'Doubl
   duplicate_question:'Cette question existe déjà.',word_length:'Le mot doit faire entre 4 et 8 lettres.',category_required:'Ajoute une catégorie : c’est l’indice affiché au joueur.',word_exists:'Ce mot est déjà dans la liste.',
   game_off:'Active d’abord le jeu.',name_too_short:'Le nom doit faire au moins 3 caractères.',name_taken:'Une compétition porte déjà ce nom.',start_in_past:'Choisis une date de début à partir d’aujourd’hui.',
   end_before_start:'La fin doit être après le début.',reward_required:'Indique ce que gagnent les joueurs.',already_started:'Cette compétition a déjà commencé.',end_in_past:'Choisis une date dans le futur.',
-  bad_short:'Sigle : 2 à 5 lettres ou chiffres.',bad_target:'Choisis une autre école.',not_found:'Élément introuvable (déjà supprimé ?).',bad_domain:'Domaine attendu : ecole.fr',short_taken:'Sigle déjà utilisé.',domain_taken:'Domaine déjà attribué à une autre école.',city_required:'Indique la ville.',
+  bad_short:'Sigle : 2 à 5 lettres ou chiffres.',bad_price:'Valeur hors limites.',bad_target:'Choisis une autre école.',not_found:'Élément introuvable (déjà supprimé ?).',bad_domain:'Domaine attendu : ecole.fr',short_taken:'Sigle déjà utilisé.',domain_taken:'Domaine déjà attribué à une autre école.',city_required:'Indique la ville.',
   domain_mismatch:'Le domaine ne correspond pas à l’école. Refuse ou demande une autre preuve.',bad_fields:'Vérifie les champs du formulaire.',already_admin:'Cette personne fait déjà partie de l’équipe.',
   last_super_admin:'Il faut garder au moins un Super admin.',cannot_remove_self:'Tu ne peux pas te retirer toi-même.',game_unavailable:'Ce jeu est désactivé.'};
 function errText(e){const m=String(e&&e.message||e||'');for(const k in ERR)if(m===k||m.startsWith(k))return ERR[k];if(/fetch|network/i.test(m))return 'Problème de connexion. Réessaie.';return m;}
@@ -95,7 +95,8 @@ async function loadSection(){
     if(sec==='content'){if(S.ui.ct==='questions')d.questions=await rpc('admin_questions');if(S.ui.ct==='words')d.words=await rpc('admin_words',{p_lang:S.ui.wl});if(S.ui.ct==='games')d.games=await rpc('admin_games');}
     if(sec==='competitions')d.comps=await rpc('admin_comps');
     if(sec==='schools'){d.schools=await rpc('admin_schools');S.schools=d.schools.schools;}
-    if(sec==='business')d.biz=await rpc('admin_business');
+    if(sec==='shop')d.shop=await rpc('admin_shop');
+    if(sec==='leagues')d.leagues=await rpc('admin_leagues',{p_q:S.ui.lgq||''});
     if(sec==='team'){const [t,l]=await Promise.all([rpc('admin_team'),rpc('admin_log',{p_q:S.ui.logq,p_limit:100})]);d.team=t;d.log=l;}
     d.err=null;
   }catch(e){d.err=errText(e);}

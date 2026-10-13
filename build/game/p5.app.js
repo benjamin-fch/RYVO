@@ -128,7 +128,7 @@ const ACT={
     S.ui.sheet={type:'share',text:txt};renderLayer();
   },
   copyShare:()=>{const ta=$('#shareTxt');if(!ta)return;const fb=()=>{ta.focus();ta.select();toast(L('Selected. Press Ctrl+C or ⌘C to copy.','Sélectionné. Fais Ctrl+C ou ⌘C pour copier.'));};try{navigator.clipboard.writeText(ta.value).then(()=>toast(L('Copied.','Copié.')),fb);}catch(e){fb();}},
-  close:()=>{S.ui.sheet=null;S.ui.notif=false;renderLayer();},
+  close:()=>{const b=S.ui.sheet&&S.ui.sheet.back;S.ui.sheet=b||null;S.ui.notif=false;renderLayer();},
   scrim:(a,el,e)=>{if(e.target===el){S.ui.sheet=null;renderLayer();}},
   notif:()=>{S.ui.notif=!S.ui.notif;S.ui.sheet=null;renderLayer();},
   readall:()=>{S.data.notifs.forEach(n=>n.read=true);save();render();},
@@ -144,6 +144,24 @@ const ACT={
   rankgo:a=>{const R=S.ui.rank;R.view='players';R.board=BOARD_IDS.includes(a)?a:'rating';R.scope='world';go('ranks');},
   rview:a=>{S.ui.rank.view=a;render();},
   rscope:a=>{const R=S.ui.rank;R.scope=a;R.loading=true;render();setTimeout(()=>{R.loading=false;if(S.route==='ranks')render();},260);},
+  /* ---------- boutique ---------- */
+  shopTab:a=>{S.ui.shop.tab=a;render();},
+  shopGo:a=>{S.ui.shop.tab=a||'avatar';go('shop');},
+  equip:a=>{const it=shopCfg().items.find(i=>i.id===a);if(!it||!ownsItem(it.kind,it.ref))return;ACT[it.kind](it.kind==='avatar'?+it.ref:it.ref);if(S.route==='shop')render();},
+  itemBuy:a=>{S.ui.sheet={type:'itemBuy',id:a};renderLayer();},
+  toPacks:()=>{S.ui.sheet=null;renderLayer();if(S.route!=='shop')go('shop');setTimeout(()=>{const n=document.getElementById('packs');if(n)n.scrollIntoView({behavior:'smooth'});},60);},
+  itemBuyYes:a=>{const st=S.data,it=shopCfg().items.find(i=>i.id===a);if(!it||ownsItem(it.kind,it.ref))return;
+    if((st.gems||0)<it.price){toast(L('Not enough gems.','Pas assez de gemmes.'));return;}
+    st.gems-=it.price;st.owned=(st.owned||[]).concat(it.id);save();S.ui.sheet=null;renderLayer();ACT.equip(it.id);SFX.play('tap');
+    toast(L(`${it.en} unlocked and equipped.`,`${it.fr} débloqué et équipé.`));render();},
+  packBuy:a=>{S.ui.sheet={type:'packBuy',id:a};renderLayer();},
+  packPay:a=>{const sh=S.ui.sheet,w=document.getElementById('waiver'),p=shopCfg().packs.find(x=>x.id===a);if(!p)return;
+    if(!w||!w.checked){sh.err=L('Tick the box to get your gems right away.','Coche la case pour recevoir tes gemmes tout de suite.');renderLayer();return;}
+    S.data.gems=(S.data.gems||0)+p.gems;save();S.ui.sheet=null;renderLayer();toast(L(`Demo: +${p.gems} gems, nothing was charged.`,`Démo : +${p.gems} gemmes, rien n’a été facturé.`));render();},
+  cgv:()=>{S.ui.sheet={type:'cgv',back:S.ui.sheet};renderLayer();},
+  watchAd:()=>{const st=S.data,C=shopCfg(),a=adState();if(!a.left||a.wait)return;const d=dayKey();
+    if(!st.ads||st.ads.day!==d)st.ads={day:d,n:0,last:0};st.ads.n++;st.ads.last=Date.now();st.gems=(st.gems||0)+C.ad_gems;save();
+    toast(L(`Demo ad: +${C.ad_gems} gems.`,`Pub simulée : +${C.ad_gems} gemmes.`));render();},
   campusEdit:()=>{Object.assign(S.ui.campus,{edit:true,q:'',pick:S.data.school.id||null,year:S.data.school.year||null,err:null,adding:false});if(S.route!=='campus')go('campus');else render();},
   campusCancel:()=>{Object.assign(S.ui.campus,{edit:false,err:null,adding:false});render();},
   campusPick:a=>{const c=S.ui.campus;c.pick=a;c.err=null;c.q='';campusRefresh();},
@@ -193,7 +211,6 @@ document.addEventListener('input',e=>{
   const k=e.target.dataset&&e.target.dataset.in;if(!k)return;
   if(k==='schoolQ'){S.ui.campus.q=e.target.value;const l=$('#schoolList');if(l)l.innerHTML=schoolListHTML(schoolFilter(e.target.value));}
   if(k==='campusNew'){S.ui.campus[e.target.dataset.k]=e.target.value;}
-  if(k==='calc'){S.ui.calc[e.target.dataset.k]=e.target.value;$('#calcOut').innerHTML=calcOut();}
 });
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 document.addEventListener('submit',e=>{

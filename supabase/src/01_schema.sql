@@ -283,3 +283,121 @@ begin
 end $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
+
+-- ---------- boutique (gemmes, cosmétiques, achats) — voir 06_shop.sql ----------
+alter table public.profiles add column if not exists gems int not null default 0;
+-- plus d'avatars possibles (les avatars de la boutique ont les numéros 8 à 15)
+alter table public.profiles drop constraint if exists profiles_avatar_check;
+alter table public.profiles add constraint profiles_avatar_check check (avatar between 0 and 15);
+
+create table if not exists public.shop_items(
+  id text primary key,                                  -- ex. 'frame:neon'
+  kind text not null check (kind in ('avatar','frame','skin')),
+  ref text not null,                                    -- valeur côté jeu : numéro d'avatar, cadre ou thème
+  name_fr text not null, name_en text not null,
+  price int not null check (price between 1 and 100000),
+  active boolean not null default true,
+  sort int not null default 0,
+  unique (kind, ref)
+);
+create table if not exists public.owned_items(
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  item_id text not null references public.shop_items(id) on delete cascade,
+  source text not null default 'shop',
+  at timestamptz not null default now(),
+  primary key (user_id, item_id)
+);
+create table if not exists public.gem_packs(
+  id text primary key,
+  gems int not null check (gems > 0),
+  price_cents int not null check (price_cents >= 50),
+  active boolean not null default true,
+  sort int not null default 0
+);
+create table if not exists public.purchases(
+  id uuid primary key default gen_random_uuid(),
+  session_id text not null unique,
+  payment_intent text,
+  user_id uuid references public.profiles(id) on delete set null,
+  pack_id text,
+  gems int not null default 0,
+  amount_cents int not null,
+  currency text not null,
+  status text not null check (status in ('paid','mismatch','refunded')),
+  resolved boolean not null default false,
+  created_at timestamptz not null default now(),
+  refunded_at timestamptz
+);
+create table if not exists public.gem_ledger(
+  id bigserial primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  delta int not null,
+  balance int not null,
+  reason text not null check (reason in ('purchase','item','ad','refund','admin','league')),
+  ref text,
+  at timestamptz not null default now()
+);
+create index if not exists gem_ledger_user on public.gem_ledger (user_id, reason, at desc);
+
+alter table public.shop_items enable row level security;
+alter table public.owned_items enable row level security;
+alter table public.gem_packs enable row level security;
+alter table public.purchases enable row level security;
+alter table public.gem_ledger enable row level security;
+revoke all on public.shop_items from anon, authenticated;
+revoke all on public.owned_items from anon, authenticated;
+revoke all on public.gem_packs from anon, authenticated;
+revoke all on public.purchases from anon, authenticated;
+revoke all on public.gem_ledger from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
+
+-- catalogue de départ (modifiable ensuite depuis la console : prix, actif/inactif)
+insert into public.gem_packs(id, gems, price_cents, sort) values
+  ('s', 100, 99, 1), ('m', 550, 499, 2), ('l', 1200, 999, 3)
+on conflict (id) do nothing;
+insert into public.shop_items(id, kind, ref, name_fr, name_en, price, sort) values
+  ('avatar:8',  'avatar', '8',  'Le Roi',        'The King',      200, 10),
+  ('avatar:9',  'avatar', '9',  'Bandeau',       'Headband',      150, 11),
+  ('avatar:10', 'avatar', '10', 'Chaton',        'Kitty',         200, 12),
+  ('avatar:11', 'avatar', '11', 'Ange',          'Angel',         250, 13),
+  ('avatar:12', 'avatar', '12', 'Roi cool',      'Cool King',     300, 14),
+  ('avatar:13', 'avatar', '13', 'Timide',        'Shy',           150, 15),
+  ('frame:neon',  'frame', 'neon',  'Néon',      'Neon',          300, 20),
+  ('frame:flame', 'frame', 'flame', 'Flamme',    'Flame',         300, 21),
+  ('frame:ice',   'frame', 'ice',   'Glace',     'Ice',           250, 22),
+  ('frame:holo',  'frame', 'holo',  'Holo',      'Holo',          400, 23),
+  ('frame:royal', 'frame', 'royal', 'Royal',     'Royal',         500, 24),
+  ('skin:night',  'skin',  'night', 'Nuit',      'Night',         250, 30),
+  ('skin:ocean',  'skin',  'ocean', 'Océan',     'Ocean',         250, 31),
+  ('skin:grape',  'skin',  'grape', 'Raisin',    'Grape',         250, 32),
+  ('skin:gold',   'skin',  'gold',  'Or',        'Gold',          400, 33)
+on conflict (id) do nothing;
+insert into public.settings(key, value) values
+  ('shop', '{"ad_gems":10,"ad_per_day":5,"ad_gap_s":45,"league_plus_gems":300}')
+on conflict (key) do nothing;
+
+-- ---------- ligues privées — voir 07_leagues.sql ----------
+create table if not exists public.leagues(
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique check (code ~ '^[A-Z0-9]{6}$'),
+  name text not null check (length(name) between 3 and 40),
+  owner uuid not null references public.profiles(id) on delete cascade,
+  sk text not null,
+  starts_at timestamptz not null default now(),
+  ends_at timestamptz not null,
+  plus boolean not null default false,
+  max_members int not null default 20,
+  col text not null default '#5B4BFF',
+  created_at timestamptz not null default now()
+);
+create table if not exists public.league_members(
+  league_id uuid not null references public.leagues(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  primary key (league_id, user_id)
+);
+create index if not exists league_members_user on public.league_members (user_id);
+alter table public.leagues enable row level security;
+alter table public.league_members enable row level security;
+revoke all on public.leagues from anon, authenticated;
+revoke all on public.league_members from anon, authenticated;

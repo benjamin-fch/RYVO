@@ -47,7 +47,8 @@ begin
     'reports', (select count(*) from reports where status = 'open'),
     'flags', (select count(*) from runs where status = 'flagged'),
     'verifs', (select count(*) from verifications where status = 'pending'),
-    'late', (select count(*) from invoices where status = 'late' or (status = 'pending' and due < current_date)),
+    'late', 0,
+    'shop', (select count(*) from purchases where status = 'mismatch' and not resolved),
     'drafts', (select count(*) from questions where status = 'draft'));
 end $$;
 
@@ -61,8 +62,8 @@ begin
     'active7', (select count(*) from profiles where last_seen > now() - interval '7 days'),
     'active30', (select count(*) from profiles where last_seen > now() - interval '30 days'),
     'verified', (select count(*) from profiles where verified),
-    'plus', (select count(*) from profiles where plus),
-    'plus_price', (setting('business')->>'plus_price')::numeric,
+    'shop_month', (select coalesce(sum(amount_cents),0) from purchases where status = 'paid' and created_at >= month_start()),
+    'buyers', (select count(distinct user_id) from purchases where status = 'paid'),
     'counts', admin_counts(),
     'series', (select jsonb_agg(jsonb_build_array(ms(d), coalesce(n,0)) order by d) from (
         select gs::timestamptz d, (select count(distinct user_id) from runs r where r.submitted_at >= gs and r.submitted_at < gs + interval '1 day') n
@@ -76,7 +77,7 @@ create or replace function public.admin_player_row(p profiles) returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object('id', p.id, 'name', p.username, 'school', p.school_id, 'program', p.program, 'year', p.study_year, 'level', level_of(p.xp), 'xp', p.xp, 'rating', p.rating,
     'matches', (select count(*) from runs r where r.user_id = p.id and r.submitted_at is not null),
-    'joined', ms(p.created_at), 'last', ms(p.last_seen), 'status', p.status, 'until', ms(p.suspended_until), 'verified', p.verified, 'plus', p.plus,
+    'joined', ms(p.created_at), 'last', ms(p.last_seen), 'status', p.status, 'until', ms(p.suspended_until), 'verified', p.verified, 'plus', p.plus, 'gems', p.gems,
     'mail', mask_email((select email from auth.users u where u.id = p.id)),
     'reports', (select count(*) from reports r where r.target = p.id and r.status = 'open'), 'notes', p.notes) $$;
 

@@ -18,6 +18,10 @@
 body[data-skin="coral"]{--brand:#F2542D;--brand2:#FF8A5C;--brand-soft:#FFE8DF}
 body[data-skin="mint"]{--brand:#0E9F78;--brand2:#3CC79E;--brand-soft:#DDF5EC}
 body[data-skin="berry"]{--brand:#D6336C;--brand2:#F06595;--brand-soft:#FDE6EE}
+body[data-skin="night"]{--brand:#3B2F99;--brand2:#6A5AE0;--brand-soft:#E7E4FA}
+body[data-skin="ocean"]{--brand:#0069A8;--brand2:#2B9ED8;--brand-soft:#DDEFFA}
+body[data-skin="grape"]{--brand:#7B2CBF;--brand2:#A25BE0;--brand-soft:#F1E5FB}
+body[data-skin="gold"]{--brand:#9C6510;--brand2:#E0A100;--brand-soft:#FBF1D6}
 *{box-sizing:border-box}
 html,body{min-height:100%}
 body{background:var(--paper);color:var(--ink);font:400 15px/1.5 var(--f-b);-webkit-font-smoothing:antialiased;overflow-x:hidden}
@@ -129,6 +133,12 @@ main{min-width:0;padding-inline:30px;padding-block:0 48px}
 .fr-candy{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--c-stack),0 0 0 7px var(--sun)}
 .fr-mint{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--c-grid),0 0 0 7px var(--c-words)}
 .fr-holo{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--c-brain),0 0 0 7px var(--c-reflex),0 0 0 10px var(--sun)}
+.fr-neon{box-shadow:0 0 0 2px var(--paper),0 0 0 5px #00D1FF,0 0 14px 5px rgba(0,209,255,.55);animation:neon 2.4s ease-in-out infinite}
+@keyframes neon{50%{box-shadow:0 0 0 2px var(--paper),0 0 0 5px #00D1FF,0 0 22px 8px rgba(0,209,255,.75)}}
+.fr-flame{box-shadow:0 0 0 2px var(--paper),0 0 0 4px #FF6B3D,0 0 0 7px #FFC93C,0 0 14px 4px rgba(255,107,61,.55)}
+.fr-ice{box-shadow:0 0 0 2px var(--paper),0 0 0 4px #BDEBFF,0 0 0 7px #3D7BFF}
+.fr-royal{box-shadow:0 0 0 2px var(--paper),0 0 0 4px #17142A,0 0 0 7px #FFC93C,0 0 0 9px #17142A}
+@media (prefers-reduced-motion:reduce){.fr-neon{animation:none}}
 .field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .field label,.field .lab{font-weight:700;font-size:13px}
 .field .help{font-size:12px;color:var(--mute)}
@@ -481,6 +491,30 @@ button.ccard[disabled]{opacity:.5;cursor:default}
 .schools li:hover{background:var(--wash)}
 .schools li[aria-selected="true"]{border-color:var(--ink);background:var(--brand-soft)}
 .schools:empty{display:none}
+.gems-chip{display:inline-flex;align-items:center;gap:6px;font:700 13px/1 var(--f-m);padding:8px 11px;border:2px solid var(--ink);border-radius:12px;background:var(--brand-soft);color:var(--ink);cursor:pointer}
+.gems-chip .ic{color:var(--brand)}
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.sitem{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px 12px;border:2px solid var(--line);border-radius:16px;background:var(--card);text-align:center}
+.sitem.own{border-color:var(--ink);background:var(--brand-soft)}
+.sitem b{font-size:14px}
+.sitem .prev{height:64px;display:flex;align-items:center;justify-content:center}
+.sitem .sw{width:56px;height:40px;border-radius:12px;border:2px solid var(--ink);display:flex;align-items:flex-end;padding:5px;gap:4px}
+.sitem .sw i{display:block;height:8px;border-radius:4px;background:#fff;flex:1}
+.packs{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.pack{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px;border:2px solid var(--ink);border-radius:18px;background:var(--card);box-shadow:3px 3px 0 var(--ink)}
+.pack .g{font:800 28px/1 var(--f-d);display:flex;align-items:center;gap:8px}
+.pack .g .ic{color:var(--brand)}
+.pack .bonus{position:absolute;top:-10px;right:10px}
+.lg-head{border-radius:18px;padding:18px;color:#fff;border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.lg-head h2{color:#fff}
+.lg-head .tiny{color:rgba(255,255,255,.85)}
+.code{font:800 22px/1 var(--f-m);letter-spacing:.18em;padding:8px 12px;border:2px dashed currentColor;border-radius:12px;display:inline-block}
+.lgl{display:flex;align-items:center;gap:12px;padding:12px;border:2px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit}
+.lgl:hover{border-color:var(--ink)}
+.lgl .dotc{width:14px;height:40px;border-radius:7px;border:2px solid var(--ink);flex:none}
+.cols{display:flex;gap:8px;flex-wrap:wrap}
+.cols button{width:30px;height:30px;border-radius:10px;border:2px solid var(--ink);cursor:pointer}
+.cols button[aria-pressed="true"]{box-shadow:0 0 0 3px var(--sun)}
 .schools li.addrow{border:2px dashed var(--line)}
 .schools li.addrow:hover{border-color:var(--ink)}
 .addbox{border:2px solid var(--line);border-radius:16px;padding:14px;background:var(--wash)}

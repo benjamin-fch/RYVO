@@ -67,16 +67,17 @@ const GAMES0=[
 ];
 const TRACKS=['City Loop','Canyon Run','Harbor Hairpin'];
 const QCATS={sci:'Sciences',geo:'Géographie',his:'Histoire',spo:'Sport',tec:'Tech',bus:'Business',cul:'Culture'};
-const ROLES={super:'Super admin',mod:'Modération',content:'Contenu',partner:'Partenariats'};
+const ROLES={super:'Super admin',mod:'Modération',content:'Contenu',partner:'Boutique & écoles'};
 const SECTIONS=[
   ['overview','Vue d’ensemble','home',['super','mod','content','partner'],null],
   ['players','Joueurs','users',['super','mod'],'Communauté'],
   ['moderation','Signalements','flag',['super','mod'],'Communauté'],
+  ['leagues','Ligues','trophy',['super','mod'],'Communauté'],
   ['anticheat','Anti-triche','shield',['super','mod'],'Communauté'],
   ['content','Contenu des jeux','book',['super','content'],'Produit'],
   ['competitions','Compétitions','trophy',['super','content','partner'],'Produit'],
-  ['schools','Écoles','campus',['super','partner'],'Partenaires'],
-  ['business','Revenus','euro',['super','partner'],'Partenaires'],
+  ['schools','Écoles','campus',['super','partner'],'Produit'],
+  ['shop','Boutique','euro',['super','partner'],'Revenus'],
   ['team','Équipe & journal','key',['super'],'Administration']
 ];
 const SEC=Object.fromEntries(SECTIONS.map(s=>[s[0],s]));

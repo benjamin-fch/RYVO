@@ -1,6 +1,6 @@
 
 /* ========================= chrome ========================= */
-const NAV0=[['home','home',()=>L('Home','Accueil')],['play','play',()=>L('Play','Jouer')],['ranks','trophy',()=>L('Rankings','Classements')],['campus','campus',()=>'Campus'],['social','users',()=>L('Social','Social')],['profile','user',()=>L('Profile','Profil')],null,['plans','gem',()=>L('Plans','Offres')],['admin','building',()=>L('Institutions','Établissements')],['tech','code',()=>L('Build notes','Notes techniques')]];
+const NAV0=[['home','home',()=>L('Home','Accueil')],['play','play',()=>L('Play','Jouer')],['ranks','trophy',()=>L('Rankings','Classements')],['leagues','flag',()=>L('Leagues','Ligues')],['campus','campus',()=>'Campus'],['social','users',()=>L('Social','Social')],['profile','user',()=>L('Profile','Profil')],null,['shop','gem',()=>L('Shop','Boutique')],['tech','code',()=>L('Build notes','Notes techniques')]];
 const NAV=LIVE?NAV0.filter(n=>!n||n[0]!=='tech'):NAV0;
 const routeGroup=r=>({lobby:'play',game:'play',result:'play'})[r]||r;
 function sideHTML(){
@@ -19,15 +19,16 @@ function topHTML(){
   <div class="grow"></div>
   <span class="stat-chip hide-m" title="${L('Day streak','Série de jours')}">${ic('flame',16)}${st.streak} ${plural(st.streak,'day','days','jour','jours')}</span>
   <span class="stat-chip hide-m">${leagueBadge(st.rating)} · ${st.rating} SR</span>
-  <div class="lang" role="group" aria-label="${L('Language','Langue')}"><button type="button" data-act="lang" data-a="fr" aria-pressed="${LANG==='fr'}">FR</button><button type="button" data-act="lang" data-a="en" aria-pressed="${LANG==='en'}">EN</button></div>
+  ${!LIVE||NET.user?`<button class="gems-chip" type="button" data-act="go" data-a="shop" aria-label="${L('Gems','Gemmes')} : ${fmt(st.gems||0)}">${ic('gem',15)}${fmt(st.gems||0)}</button>`:''}
+  <div class="lang hide-m" role="group" aria-label="${L('Language','Langue')}"><button type="button" data-act="lang" data-a="fr" aria-pressed="${LANG==='fr'}">FR</button><button type="button" data-act="lang" data-a="en" aria-pressed="${LANG==='en'}">EN</button></div>
   <button class="iconbtn" type="button" data-act="sound" aria-pressed="${st.sound}" aria-label="${st.sound?L('Sound on','Son activé'):L('Sound off','Son coupé')}">${ic(st.sound?'sound':'mute')}</button>
   <button class="iconbtn" type="button" data-act="notif" aria-label="${L('Notifications','Notifications')}${unread?` (${unread})`:''}">${ic('bell')}${unread?`<span class="dot">${unread>9?'9+':unread}</span>`:''}</button>
   ${st.account.signedIn?`<button class="me-btn hide-m" type="button" data-act="go" data-a="profile">${avMe(32)}<span class="t">${esc(st.account.username)}</span></button>`:`<button class="btn sm primary hide-m" type="button" data-act="auth" data-a="signup">${L('Sign in','Connexion')}</button>`}`;
 }
 function mnavHTML(){
   const cur=routeGroup(S.route);
-  const items=[['home','home',()=>L('Home','Accueil')],['play','play',()=>L('Play','Jouer')],['ranks','trophy',()=>L('Ranks','Classements')],['social','users',()=>'Social']];
-  const inMore=['campus','profile','plans','admin','tech'].includes(cur);
+  const items=[['home','home',()=>L('Home','Accueil')],['play','play',()=>L('Play','Jouer')],['ranks','trophy',()=>L('Ranks','Classements')],['leagues','flag',()=>L('Leagues','Ligues')]];
+  const inMore=['campus','profile','shop','social','tech'].includes(cur);
   return items.map(n=>`<button type="button" data-act="go" data-a="${n[0]}" ${cur===n[0]?'aria-current="page"':''}>${ic(n[1],20)}${n[2]()}</button>`).join('')+`<button type="button" data-act="more" ${inMore?'aria-current="page"':''}>${ic('dots',20)}${L('More','Plus')}</button>`;
 }
 const footHTML=()=>LIVE?`<span>RYVO · ${new Date().getFullYear()}</span><span>${L('Scores are checked by the server. Pages marked “demo” show fictional examples.','Les scores sont vérifiés par le serveur. Les pages marquées « démo » montrent des exemples fictifs.')}</span><span>${L('Questions or data requests:','Questions ou demandes sur tes données :')} ${esc(CFG.contact||'')}</span>`:`<span>RYVO · ${L('prototype build 0.5','prototype version 0.5')} · ${new Date().toLocaleDateString(LOC(),{month:'long',year:'numeric'})}</span><span>${L('Frontend-only demo. Players, schools and figures marked “simulated” or “demo” are fictional.','Démo sans serveur. Les joueurs, écoles et chiffres marqués « simulé » ou « démo » sont fictifs.')}</span>`;
@@ -457,10 +458,10 @@ VIEWS.profile=()=>{
     <section class="card c12"><div class="card-h"><h2>${L('Achievements','Succès')}</h2><span class="tiny">${st.ach.length}/${ACH.length}</span></div>
       <div class="achs">${ACH.map(a=>achBadge(a,st.ach.includes(a.id))).join('')}</div></section>
     <section class="card c6"><div class="card-h"><h2>${L('Look','Apparence')}</h2><span class="tiny">${L('Cosmetic only. Never affects scoring.','Purement esthétique. N’influence jamais le score.')}</span></div>
-      <h3>Avatar</h3><div class="choice">${AV_PRESETS.map((a,i)=>`<button type="button" data-act="avatar" data-a="${i}" aria-pressed="${st.account.avatar===i}" ${a.premium?'disabled':''}>${face(a,38)}${a.premium?'Plus':L('Free','Gratuit')}</button>`).join('')}</div>
-      <h3>${L('Profile frame','Cadre de profil')}</h3><div class="choice">${FRAMES.map(f=>{const ok=!f.premium&&lv.L>=f.lv;return `<button type="button" data-act="frame" data-a="${f.id}" aria-pressed="${st.account.frame===f.id}" ${ok?'':'disabled'}>${avP(me(),34,f.id)}${f.n()}<span class="mono" style="font-size:9.5px">${f.premium?'Plus':ok?L('Owned','Débloqué'):L('Lv','Niv.')+' '+f.lv}</span></button>`;}).join('')}</div>
-      <h3>${L('Theme colour','Couleur du thème')}</h3><div class="choice">${SKINS.map(k=>{const ok=lv.L>=k.lv;return `<button type="button" data-act="skin" data-a="${k.id}" aria-pressed="${st.account.skin===k.id}" ${ok?'':'disabled'}><span style="width:34px;height:34px;border-radius:11px;background:${k.c};border:2px solid ${INK}"></span>${k.n()}<span class="mono" style="font-size:9.5px">${ok?L('Owned','Débloqué'):L('Lv','Niv.')+' '+k.lv}</span></button>`;}).join('')}</div>
-      <p class="tiny">${L('“Plus” items preview optional paid cosmetics. They can’t be bought in this demo.','Les éléments « Plus » sont des aperçus de cosmétiques payants. Impossible de les acheter dans cette démo.')}</p>
+      <h3>Avatar</h3><div class="choice">${AV_PRESETS.map((a,i)=>{const own=!a.premium||ownsItem('avatar',i),it=itemOf('avatar',i);if(a.premium&&!own&&!it)return '';return `<button type="button" data-act="${own?'avatar':'shopGo'}" data-a="${own?i:'avatar'}" aria-pressed="${st.account.avatar===i}">${face(a,38)}${own?(a.premium?L('Yours','À toi'):L('Free','Gratuit')):`<span class="mono" style="font-size:9.5px">${ic('gem',11)} ${it.price}</span>`}</button>`;}).join('')}</div>
+      <h3>${L('Profile frame','Cadre de profil')}</h3><div class="choice">${FRAMES.map(f=>{const it=f.premium?itemOf('frame',f.id):null,own=f.premium&&ownsItem('frame',f.id),ok=f.premium?own:lv.L>=f.lv;if(f.premium&&!own&&!it)return '';return `<button type="button" data-act="${f.premium&&!own?'shopGo':'frame'}" data-a="${f.premium&&!own?'frame':f.id}" aria-pressed="${st.account.frame===f.id}" ${ok||f.premium?'':'disabled'}>${avP(me(),34,f.id)}${f.n()}<span class="mono" style="font-size:9.5px">${f.premium?(own?L('Yours','À toi'):`${ic('gem',11)} ${it.price}`):ok?L('Owned','Débloqué'):L('Lv','Niv.')+' '+f.lv}</span></button>`;}).join('')}</div>
+      <h3>${L('Theme colour','Couleur du thème')}</h3><div class="choice">${SKINS.map(k=>{const it=k.premium?itemOf('skin',k.id):null,own=k.premium&&ownsItem('skin',k.id),ok=k.premium?own:lv.L>=k.lv;if(k.premium&&!own&&!it)return '';return `<button type="button" data-act="${k.premium&&!own?'shopGo':'skin'}" data-a="${k.premium&&!own?'skin':k.id}" aria-pressed="${st.account.skin===k.id}" ${ok||k.premium?'':'disabled'}><span style="width:34px;height:34px;border-radius:11px;background:${k.c};border:2px solid ${INK}"></span>${k.n()}<span class="mono" style="font-size:9.5px">${k.premium?(own?L('Yours','À toi'):`${ic('gem',11)} ${it.price}`):ok?L('Owned','Débloqué'):L('Lv','Niv.')+' '+k.lv}</span></button>`;}).join('')}</div>
+      <p class="tiny">${L('More avatars, frames and themes in the Shop.','D’autres avatars, cadres et thèmes dans la Boutique.')} <button class="btn sm ghost" type="button" data-act="go" data-a="shop">${ic('gem',14)}${L('Shop','Boutique')}</button></p>
     </section>
     ${LIVE?accountCardLive():`<section class="card c6"><div class="card-h"><h2>${L('Account and data','Compte et données')}</h2>${simPill(L('Local demo','Démo locale'))}</div>
       <div class="note">${ic('info')}<span>${L('No real account exists. Your username, cosmetics and scores live in this browser only. Passwords and emails are never stored.','Aucun vrai compte n’existe. Ton pseudo, tes cosmétiques et tes scores restent dans ce navigateur. Mots de passe et e-mails ne sont jamais enregistrés.')}</span></div>
@@ -470,91 +471,90 @@ VIEWS.profile=()=>{
   </div>`;
 };
 
-function calcOut(){
-  const c=S.ui.calc,n=k=>Math.max(0,Number(c[k])||0);
-  const plus=n('mau')*n('conv')/100*n('price')*12,inst=n('inst')*n('instPrice'),sp=n('spons')*n('sponsPrice'),tot=plus+inst+sp;
-  const k=v=>fmt(v)+' €';
-  return `<div class="kpi"><small>Plus · ${L('per year','par an')}</small><b>${k(plus)}</b></div><div class="kpi"><small>${L('Institutions · per year','Établissements · par an')}</small><b>${k(inst)}</b></div><div class="kpi"><small>${L('Sponsors · per year','Sponsors · par an')}</small><b>${k(sp)}</b></div><div class="kpi" style="border:2px solid ${INK};background:#FFC93C"><small>${L('Scenario total · per year','Total du scénario · par an')}</small><b>${k(tot)}</b></div>`;
+/* ========================= boutique ========================= */
+function adState(){
+  const C=shopCfg(),st=S.data;
+  if(LIVE){const on=!!(CFG.ads&&CFG.ads.client),m=NET.me||{},used=m.ads_today||0,last=m.ad_last||0;
+    return {on,left:Math.max(0,C.ad_per_day-used),wait:Math.max(0,Math.ceil((last+C.ad_gap_s*1000-Date.now())/1000))};}
+  const d=dayKey(),a=st.ads||{},used=a.day===d?a.n:0;
+  return {on:true,sim:true,left:Math.max(0,C.ad_per_day-used),wait:Math.max(0,Math.ceil(((a.last||0)+C.ad_gap_s*1000-Date.now())/1000))};
 }
-VIEWS.plans=()=>{
-  const li=a=>a.map(x=>`<li>${ic('check',16)}<span>${x}</span></li>`).join('');
-  return `
-  <div class="page-h"><div><p class="eyebrow">${L('Business model','Modèle économique')}</p><h1>${L('Free to compete. Paid for extras, never for wins.','Gratuit pour jouer. Payant pour les extras, jamais pour gagner.')}</h1><p>${L('Core games and rankings stay free. Revenue comes from optional cosmetics and stats, institutions that run competitions, and clearly labelled sponsors.','Les jeux et classements restent gratuits. Les revenus viennent des cosmétiques et stats optionnels, des établissements qui organisent des compétitions et de sponsors clairement identifiés.')}</p></div>
-  <div class="row"><span class="pill now">${L('In this prototype','Dans ce prototype')}</span><span class="pill future">${L('Future','À venir')}</span></div></div>
+const payReady=()=>!LIVE||!!(CFG.payments&&CFG.seller);
+function itemPreview(it,size=56){
+  if(it.kind==='avatar')return `<span class="avw">${face(AV_PRESETS[+it.ref]||AV_PRESETS[0],size)}</span>`;
+  if(it.kind==='frame')return avP(me(),size-8,it.ref);
+  const k=SKINS.find(x=>x.id===it.ref)||{c:'#ccc'};return `<span class="sw" style="background:${k.c}"><i></i><i style="background:var(--sun);flex:.6"></i></span>`;
+}
+const isEquipped=it=>{const a=S.data.account;return it.kind==='avatar'?a.avatar===+it.ref:it.kind==='frame'?a.frame===it.ref:a.skin===it.ref;};
+VIEWS.shop=()=>{
+  const st=S.data,C=shopCfg(),signed=!LIVE||!!NET.user,tab=S.ui.shop.tab,ad=adState();
+  const rate=C.packs.length?Math.min(...C.packs.map(p=>p.cents/p.gems)):0,base=C.packs.length?Math.max(...C.packs.map(p=>p.cents/p.gems)):0;
+  const packs=C.packs.map((p,i)=>{const bonus=base?Math.round((base/(p.cents/p.gems)-1)*100):0;
+    return `<div class="pack">${bonus>=5?`<span class="sticker${i===C.packs.length-1?' pink':''} bonus">+${bonus} %</span>`:''}<span class="g">${ic('gem',24)}${fmt(p.gems)}</span><span class="tiny">${L('gems','gemmes')}</span>
+      <button class="btn ${i===1?'hot':'primary'}" type="button" data-act="packBuy" data-a="${p.id}" ${payReady()?'':'disabled'}>${eur(p.cents)}</button></div>`;}).join('');
+  const items=C.items.filter(i=>i.kind===tab);
+  const card=it=>{const own=ownsItem(it.kind,it.ref),eq=own&&isEquipped(it);
+    return `<div class="sitem${own?' own':''}"><span class="prev">${itemPreview(it)}</span><b>${esc(L(it.en,it.fr))}</b>
+      ${own?(eq?`<span class="pill now">${ic('check',13)}${L('Equipped','Équipé')}</span>`:`<button class="btn sm" type="button" data-act="equip" data-a="${it.id}">${L('Equip','Équiper')}</button>`)
+        :`<button class="btn sm primary" type="button" data-act="itemBuy" data-a="${it.id}">${ic('gem',14)}${fmt(it.price)}</button>`}</div>`;};
+  return `<div class="page-h"><div><p class="eyebrow">${L('Shop','Boutique')}</p><h1>${L('Stand out. Never pay to win.','Démarque-toi. Sans jamais payer pour gagner.')}</h1>
+    <p>${L('Avatars, frames and themes that everyone sees in the rankings. Nothing here changes a score, a timer or a rating.','Des avatars, cadres et thèmes que tout le monde voit dans les classements. Rien ici ne change un score, un chrono ou une cote.')}</p></div>
+    ${signed?`<div class="kpi" style="min-width:150px"><small>${L('Your gems','Tes gemmes')}</small><b class="row" style="gap:6px;flex-wrap:nowrap">${ic('gem',20)}${fmt(st.gems||0)}</b></div>`:''}</div>
+  ${LIVE&&!NET.user?`<div class="note" style="margin-bottom:16px">${ic('info')}<span>${L('Sign in to buy and keep your items on every device.','Connecte-toi pour acheter et retrouver tes objets sur tous tes appareils.')}</span><button class="btn sm primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button></div>`:''}
   <div class="grid">
-    <section class="card c3 tier"><div class="card-h"><h2>${L('Free','Gratuit')}</h2><span class="pill now">${L('Prototype','Prototype')}</span></div><p class="price">0 €</p><ul>${li([L('All 8 games and every mode','Les 8 jeux et tous les modes'),L('Standard leaderboards','Classements standard'),L('Basic stats and history','Stats et historique de base'),L('8 avatars, level-unlocked frames and themes','8 avatars, cadres et thèmes débloqués par niveau')])}</ul></section>
-    <section class="card c3 tier"><div class="card-h"><h2>Plus</h2><span class="pill future">${L('Future','À venir')}</span></div><p class="price">3,99 €<small> / ${L('month · untested placeholder','mois · prix provisoire non testé')}</small></p><ul>${li([L('Advanced stats: consistency, reaction spread','Stats avancées : régularité, dispersion des réflexes'),L('Full performance history','Historique complet'),L('Personal training challenges','Défis d’entraînement personnels'),L('Premium avatars, frames, themes','Avatars, cadres et thèmes premium')])}</ul><p class="tiny">${L('Plus never changes physics, timers, question pools or rating maths.','Plus ne change jamais la physique, les chronos, les questions ni le calcul de la cote.')}</p></section>
-    <section class="card c3 tier feat"><div class="card-h"><h2>Campus</h2><span class="pill ink">${L('Validate first','À valider en premier')}</span></div><p class="price">${L('Annual licence','Licence annuelle')}<small> · ${L('per institution','par établissement')}</small></p><ul>${li([L('Institution dashboard (preview in this build)','Tableau de bord établissement (aperçu ici)'),L('Private and inter-university tournaments','Tournois privés et inter-universités'),L('Custom branding on campus events','Habillage aux couleurs du campus'),L('Aggregate analytics only','Statistiques agrégées uniquement')])}</ul><button class="btn sm dark" type="button" data-act="go" data-a="admin">${L('See the dashboard preview','Voir l’aperçu du tableau de bord')}</button></section>
-    <section class="card c3 tier"><div class="card-h"><h2>Sponsors</h2><span class="pill future">${L('Future','À venir')}</span></div><p class="price">${L('Per event','Par événement')}<small> · ${L('or per season','ou par saison')}</small></p><ul>${li([L('Sponsored tournaments and seasons','Tournois et saisons sponsorisés'),L('Labelled branded challenges','Défis de marque identifiés'),L('Cosmetic collaborations','Collaborations cosmétiques'),L('Prizes paid by sponsors, never by players','Lots payés par les sponsors, jamais par les joueurs')])}</ul></section>
-    <section class="card c6"><div class="card-h"><h2>${L('Advertising rules','Règles publicitaires')}</h2><span class="pill future">${L('Future · optional','À venir · optionnel')}</span></div><ul class="list">${li([L('Placements only on menus and result screens, never during a run.','Uniquement dans les menus et écrans de résultat, jamais pendant une partie.'),L('No rewarded ads that grant attempts, boosts or rating.','Pas de pub récompensée donnant essais, boosts ou cote.'),L('Every sponsored challenge is labelled and has its own leaderboard.','Chaque défi sponsorisé est identifié et a son propre classement.'),L('Ad-light for under-18s and institution events.','Publicité réduite pour les moins de 18 ans et les événements d’établissement.')])}</ul></section>
-    <section class="card c6"><div class="card-h"><h2>${L('Fair-play pledge','Engagement fair-play')}</h2></div><ul class="list">${[L('No real-money wagering, betting, loot boxes or paid entry to ranked play.','Pas de paris d’argent réel, de loot boxes ni d’entrée payante en classé.'),L('Paying users get no extra Daily attempts and no gameplay advantage.','Les abonnés n’ont ni essais supplémentaires ni avantage de jeu.'),L('Institutions see aggregates, never individual students’ data.','Les établissements voient des agrégats, jamais les données individuelles.')].map(x=>`<li>${ic('shield',16)}<span>${x}</span></li>`).join('')}</ul></section>
-    <section class="card c12"><div class="card-h"><div class="l"><h2>${L('Scenario calculator','Simulateur de scénario')}</h2><span class="pill warn">${L('Illustrative assumptions','Hypothèses illustratives')}</span></div></div>
-      <p class="tiny">${L('Every number is an input you control, not a measured figure.','Chaque chiffre est une hypothèse que tu choisis, pas une donnée mesurée.')}</p>
-      <div class="calc">${[['mau',L('Monthly active players','Joueurs actifs / mois'),1000],['conv',L('Plus conversion (%)','Conversion Plus (%)'),0.1],['price',L('Plus price (€/month)','Prix Plus (€/mois)'),0.5],['inst',L('Paying institutions','Établissements payants'),1],['instPrice',L('Licence (€/year)','Licence (€/an)'),100],['spons',L('Sponsored events/year','Événements sponsorisés/an'),1],['sponsPrice',L('Price per event (€)','Prix par événement (€)'),100]].map(([k,l,step])=>`<div class="field"><label for="calc_${k}">${l}</label><input class="input" id="calc_${k}" type="number" min="0" step="${step}" value="${S.ui.calc[k]}" data-in="calc" data-k="${k}"></div>`).join('')}</div>
-      <div class="calc-out" id="calcOut">${calcOut()}</div>
-    </section>
-    <section class="card c12"><div class="card-h"><h2>${L('What to validate first','À valider en premier')}</h2></div>
-      <div class="prose"><p><b>${L('Campus tournaments sold through student associations and universities.','Des tournois de campus vendus via les BDE et les universités.')}</b> ${L('One paid pilot answers the key questions fast: will a campus pay, do students show up, do they come back the next week? No app-store billing, an identifiable buyer, and the School Cup mechanics already exist.','Un pilote payant répond vite aux questions clés : un campus paie-t-il, les étudiants viennent-ils, reviennent-ils la semaine suivante ? Pas de paiement via les stores, un acheteur identifié, et la mécanique de Coupe existe déjà.')}</p>
-      <p>${L('Plus only makes sense once retention is proven. Sponsors follow a measurable campus audience.','Plus n’a de sens qu’une fois la rétention prouvée. Les sponsors suivront une audience campus mesurable.')}</p></div></section>
+    <section class="card c12"><div class="card-h"><h2>${L('Cosmetics','Cosmétiques')}</h2>${!LIVE?simPill(L('Demo · nothing is charged','Démo · rien n’est facturé')):''}</div>
+      <div class="seg" role="tablist" aria-label="${L('Category','Catégorie')}" style="margin-bottom:14px">${[['avatar',L('Avatars','Avatars')],['frame',L('Frames','Cadres')],['skin',L('Themes','Thèmes')]].map(x=>`<button type="button" role="tab" aria-selected="${tab===x[0]}" data-act="shopTab" data-a="${x[0]}">${x[1]}</button>`).join('')}</div>
+      ${items.length?`<div class="shop-grid">${items.map(card).join('')}</div>`:`<div class="empty"><b>${L('Nothing on sale here right now','Rien en vente ici pour le moment')}</b></div>`}</section>
+    <section class="card c8" id="packs"><div class="card-h"><h2>${L('Gems','Gemmes')}</h2>${payReady()?`<span class="tiny">${L('Card payment by Stripe','Paiement par carte via Stripe')}</span>`:`<span class="pill">${L('Card payment coming soon','Paiement par carte bientôt')}</span>`}</div>
+      <div class="packs">${packs}</div>
+      <p class="tiny" style="margin-top:12px">${L('Prices include VAT. RYVO never sees your card. Gems are only used for cosmetics, can’t be exchanged for money and give no in-game advantage. Under 18: ask a parent before buying.','Prix TTC. RYVO ne voit jamais ta carte. Les gemmes servent uniquement aux cosmétiques, ne s’échangent pas contre de l’argent et ne donnent aucun avantage en jeu. Moins de 18 ans : demande l’accord d’un parent avant d’acheter.')}
+      <button class="btn sm ghost" type="button" data-act="cgv">${L('Terms of sale','Conditions de vente')}</button></p></section>
+    <section class="card c4"><div class="card-h"><h2>${L('Free gems','Gemmes gratuites')}</h2>${ad.sim?simPill():''}</div>
+      ${ad.on?`<p class="tiny">${L(`Watch a short ad and get ${C.ad_gems} gems. Up to ${C.ad_per_day} a day.`,`Regarde une courte pub et gagne ${C.ad_gems} gemmes. Jusqu’à ${C.ad_per_day} par jour.`)}</p>
+        <button class="btn" type="button" data-act="watchAd" ${signed&&ad.left&&!ad.wait?'':'disabled'}>${ic('tv',16)}${!signed?L('Sign in first','Connecte-toi d’abord'):!ad.left?L('Come back tomorrow','Reviens demain'):ad.wait?L(`Next in ${ad.wait} s`,`Prochaine dans ${ad.wait} s`):L(`Watch · +${C.ad_gems}`,`Regarder · +${C.ad_gems}`)}</button>
+        <p class="tiny">${ad.left} ${plural(ad.left,'left today','left today','restante aujourd’hui','restantes aujourd’hui')}. ${L('Ads only appear when you ask, never during a game.','Les pubs n’apparaissent que si tu le demandes, jamais pendant une partie.')}</p>`
+      :`<p class="tiny">${L('Coming soon: watch a short ad to earn gems. Ads will only play when you ask, never during a game.','Bientôt : regarde une courte pub pour gagner des gemmes. Les pubs ne passeront que si tu le demandes, jamais pendant une partie.')}</p>`}
+      <p class="tiny">${L('Leagues: owners can upgrade to League+ with gems.','Ligues : le créateur peut passer en Ligue+ avec des gemmes.')} <button class="btn sm ghost" type="button" data-act="go" data-a="leagues">${ic('flag',14)}${L('Leagues','Ligues')}</button></p></section>
   </div>`;
 };
-
-VIEWS.admin=()=>{
-  const st=S.data,a=S.ui.admin;
-  const wk=[640,702,688,810,905,962,1104,1212],W=520,H=190,pl=40,pb=24,pt=14,maxV=1400,yv=v=>pt+(H-pt-pb)*(1-v/maxV),bw=(W-pl-10)/wk.length;
-  const chart=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('Weekly active players, last 8 weeks, from 640 to 1,212','Joueurs actifs par semaine, 8 dernières semaines, de 640 à 1 212')}" style="width:100%;height:auto">
-    <g class="gl">${[0,400,800,1200].map(v=>`<line x1="${pl}" x2="${W-6}" y1="${yv(v)}" y2="${yv(v)}"/><text x="${pl-6}" y="${yv(v)+3}" text-anchor="end">${fmt(v)}</text>`).join('')}</g>
-    ${wk.map((v,i)=>`<rect x="${pl+i*bw+6}" y="${yv(v)}" width="${bw-12}" height="${yv(0)-yv(v)}" rx="5" fill="${i===wk.length-1?'#FFC93C':'#5B4BFF'}" stroke="${INK}" stroke-width="2"/><text x="${pl+i*bw+bw/2}" y="${H-7}" text-anchor="middle">S${i+1}</text>`).join('')}
-    <text x="${pl+(wk.length-1)*bw+bw/2}" y="${yv(1212)-6}" text-anchor="middle" style="fill:${INK};font-weight:700">${fmt(1212)}</text></svg>`;
-  const pop=[['Pop Shot',22,'#F23F55'],['Reflex Arena',18,'#FF6B3D'],['Brain Battle',16,'#8B5CF6'],['Word Rush',13,'#00A6C8'],['Skyline Stack',12,'#FF4FA0'],['Neon Sprint',10,'#3D7BFF'],['Card Clash',5,'#FFB800'],['Grid Lock',4,'#14B37A']];
-  const progs=[['bus2',214,64],['eng1',188,58],['log1',96,51],['cs2',143,49],['des3',62,41],['law1',7,null]];
-  const evs=st.events.slice().sort((x,y)=>x.date-y.date);
-  const in7=new Date(Date.now()+7*864e5).toISOString().slice(0,10);
-  return `<div class="page-h"><div><p class="eyebrow">${L('Institution console · preview','Console établissement · aperçu')}</p><h1>Northbridge University</h1><p>${L('What a campus partner would see: participation and competition tools built on aggregates, so staff never browse individual students’ activity.','Ce que verrait un campus partenaire : participation et outils de compétition fondés sur des agrégats, sans accès à l’activité individuelle des étudiants.')}</p></div><div class="row"><span class="pill sim">${L('Fictional demo data','Données démo fictives')}</span><span class="pill future">${L('Future product','Produit à venir')}</span></div></div>
-  <div class="grid">
-    <section class="card c12"><div class="kpis">
-      <div class="kpi"><small>${L('Registered students','Étudiants inscrits')}</small><b>${fmt(2184)}</b></div>
-      <div class="kpi"><small>${L('Active · 30 days','Actifs · 30 jours')}</small><b>${fmt(1212)}</b></div>
-      <div class="kpi"><small>${L('Participation rate','Taux de participation')}</small><b>55 %</b></div>
-      <div class="kpi"><small>${L('Matches this month','Matchs ce mois-ci')}</small><b>${fmt(18940)}</b></div>
-      <div class="kpi"><small>${L('Cup position','Position en Coupe')}</small><b>#${(uniRows().find(u=>u.id==='nbu')||{pos:'–'}).pos}</b></div>
-    </div></section>
-    <section class="card c7"><div class="card-h"><h2>${L('Weekly active players','Joueurs actifs par semaine')}</h2><span class="tiny">${L('Last 8 weeks','8 dernières semaines')}</span></div>${chart}</section>
-    <section class="card c5"><div class="card-h"><h2>${L('Most played games','Jeux les plus joués')}</h2><span class="tiny">${L('Share of matches','Part des matchs')}</span></div>
-      ${pop.map(p=>`<div class="hbar"><span>${p[0]}</span><div class="bar thin"><i style="width:${p[1]/22*100}%;background:${p[2]}"></i></div><span class="mono tiny" style="text-align:right">${p[1]} %</span></div>`).join('')}
-    </section>
-    <section class="card c6"><div class="card-h"><h2>${L('Programs by participation','Programmes par participation')}</h2><span class="tiny">${L('Groups under 10 hidden','Groupes < 10 masqués')}</span></div>
-      <div class="lb">${progs.map((p,i)=>`<div class="lb-row${i<3?' top':''}" style="grid-template-columns:38px minmax(0,1fr) auto"><span class="pos">${p[2]==null?'–':i+1}</span><span class="nm"><b>${esc(prog(p[0]))}</b><small>${p[2]==null?L('Fewer than 10 active students · hidden for privacy','Moins de 10 étudiants actifs · masqué pour la confidentialité'):p[1]+' '+L('active students','étudiants actifs')}</small></span><span class="val">${p[2]==null?'—':p[2]+' %'}</span></div>`).join('')}</div>
-      <h3 style="margin-top:8px">${L('Competition participation','Participation aux compétitions')}</h3>
-      <dl class="cmp"><dt>Welcome Week Reflex Cup</dt><dd>412 · 88 %</dd><dt>${L('Inter-campus Word Rush','Word Rush inter-campus')}</dt><dd>276 · 74 %</dd><dt>${L('Weekly School Cup (avg)','Coupe hebdo (moyenne)')}</dt><dd>590</dd></dl>
-    </section>
-    <section class="card pop c6"><div class="card-h"><h2>${L('Schedule a competition','Programmer une compétition')}</h2>${simPill(L('Saved locally','Enregistré localement'))}</div>
-      <form data-form="tour" class="stack" novalidate>
-        <div class="field"><label for="tName">${L('Name','Nom')}</label><input class="input" id="tName" name="name" maxlength="48" placeholder="${L('e.g. Business Week Stack Cup','ex. Coupe Stack de la semaine Business')}"></div>
-        <div class="row" style="align-items:flex-start">
-          <div class="field" style="flex:1;min-width:140px"><label for="tGame">${L('Game','Jeu')}</label><select class="input" id="tGame" name="game">${PLAYABLE.map(g=>`<option value="${g.id}">${g.name}</option>`).join('')}</select></div>
-          <div class="field" style="flex:1;min-width:140px"><label for="tDate">Date</label><input class="input" id="tDate" name="date" type="date" value="${in7}"></div>
-        </div>
-        <div class="row" style="align-items:flex-start">
-          <div class="field" style="flex:1;min-width:140px"><label for="tVis">${L('Visibility','Visibilité')}</label><select class="input" id="tVis" name="vis"><option value="private">${L('Private · Northbridge only','Privée · Northbridge uniquement')}</option><option value="public">${L('Public · other universities','Publique · autres universités')}</option></select></div>
-          <div class="field" style="flex:1;min-width:140px"><label for="tElig">${L('Eligible','Éligibles')}</label><select class="input" id="tElig" name="elig"><option value="all">${L('All programs','Tous les programmes')}</option>${PROG_IDS.map(p=>`<option value="${p}">${esc(prog(p))}</option>`).join('')}</select></div>
-        </div>
-        ${a.err?`<div class="note err">${ic('info')}<span>${esc(a.err)}</span></div>`:''}
-        <button class="btn primary" type="submit">${L('Schedule competition','Programmer')}</button>
-        <p class="tiny">${L('Scheduling here notifies no one. In production, students opt in from the app; staff never get a contact list.','Programmer ici ne prévient personne. En production, les étudiants s’inscrivent depuis l’app ; le personnel n’a jamais de liste de contacts.')}</p>
-      </form>
-    </section>
-    <section class="card c7"><div class="card-h"><h2>${L('Upcoming competitions','Compétitions à venir')}</h2><span class="tiny">${evs.length}</span></div>
-      ${evs.length?`<ul class="hist">${evs.map(e=>{const G=GAME[e.game];return `<li style="--g:${G.col}"><span class="gico">${ic('cal',18)}</span><span class="t"><b>${esc(e.name)}</b><small>${G.name} · ${e.vis==='public'?L('Public, inter-university','Publique, inter-universités'):L('Private, Northbridge only','Privée, Northbridge')} · ${e.elig==='all'?L('All programs','Tous les programmes'):esc(prog(e.elig))}</small></span><span class="r">${dateLabel(e.date)}${e.seed?`<small>${L('demo','démo')}</small>`:`<small><button class="btn sm ghost" type="button" data-act="evDel" data-a="${e.id}">${L('Cancel','Annuler')}</button></small>`}</span></li>`;}).join('')}</ul>`:`<div class="empty"><b>${L('Nothing scheduled','Rien de programmé')}</b></div>`}
-    </section>
-    <section class="card c5"><div class="card-h"><h2>${L('Privacy by design','Confidentialité dès la conception')}</h2></div>
-      <ul class="list">
-        <li>${ic('check',16)}<span><b>${L('Staff see:','Le personnel voit :')}</b> ${L('totals, rates, program aggregates, results students chose to make public.','totaux, taux, agrégats par programme, résultats rendus publics par les étudiants.')}</span></li>
-        <li>${ic('x',16)}<span><b>${L('Staff don’t see:','Le personnel ne voit pas :')}</b> ${L('individual play history, emails, presence, or who played when.','l’historique individuel, les e-mails, la présence, ni qui a joué quand.')}</span></li>
-        <li>${ic('shield',16)}<span>${L('Small groups are suppressed so no student can be singled out.','Les petits groupes sont masqués pour qu’aucun étudiant ne soit identifiable.')}</span></li>
-      </ul></section>
-  </div>`;
-};
+function shopSheetHTML(sh,closeBtn){
+  const st=S.data,C=shopCfg();
+  if(sh.type==='itemBuy'){
+    const it=C.items.find(i=>i.id===sh.id);if(!it)return closeBtn;const miss=it.price-(st.gems||0);
+    return `<div class="modal-h"><div><h2>${esc(L(it.en,it.fr))}</h2><p>${it.kind==='avatar'?'Avatar':it.kind==='frame'?L('Profile frame','Cadre de profil'):L('Theme colour','Couleur du thème')} · ${L('cosmetic only','purement esthétique')}</p></div>${closeBtn}</div>
+      <div class="row" style="justify-content:center;padding:8px 0 4px">${itemPreview(it,80)}</div>
+      <dl class="cmp"><dt>${L('Price','Prix')}</dt><dd>${gemTxt(it.price)}</dd><dt>${L('Your balance','Ton solde')}</dt><dd>${gemTxt(st.gems||0)}</dd></dl>
+      ${miss>0?`<div class="note">${ic('info')}<span>${L(`You need ${gemTxt(miss)} more.`,`Il te manque ${gemTxt(miss)}.`)}</span></div><button class="btn primary" type="button" data-act="toPacks">${L('Get gems','Obtenir des gemmes')}</button>`
+        :`<button class="btn primary" type="button" data-act="itemBuyYes" data-a="${it.id}">${L(`Buy for ${gemTxt(it.price)}`,`Acheter pour ${gemTxt(it.price)}`)}</button><p class="tiny">${L('Equipped right away. Yours for good.','Équipé tout de suite. À toi pour de bon.')}</p>`}`;
+  }
+  if(sh.type==='packBuy'){
+    const p=C.packs.find(x=>x.id===sh.id);if(!p)return closeBtn;
+    if(LIVE&&!NET.user)return `<div class="modal-h"><div><h2>${gemTxt(p.gems)} · ${eur(p.cents)}</h2></div>${closeBtn}</div><p>${L('Sign in to buy gems: they are saved on your account.','Connecte-toi pour acheter des gemmes : elles sont enregistrées sur ton compte.')}</p><button class="btn primary" type="button" data-act="auth" data-a="signup">${L('Create an account','Créer un compte')}</button>`;
+    return `<div class="modal-h"><div><h2>${gemTxt(p.gems)} · ${eur(p.cents)}</h2><p>${LIVE?L('You’ll pay on Stripe’s secure page, then come back here.','Tu paies sur la page sécurisée de Stripe, puis tu reviens ici.'):L('Demo: nothing is charged, gems are simulated.','Démo : rien n’est facturé, les gemmes sont simulées.')}</p></div>${closeBtn}</div>
+      <label class="tiny" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="waiver" style="margin-top:3px"><span>${L('I want the gems delivered immediately and I waive my 14-day right of withdrawal.','Je veux recevoir les gemmes tout de suite et je renonce à mon droit de rétractation de 14 jours.')}</span></label>
+      ${sh.err?`<p class="err" style="color:var(--bad);font-size:13px;font-weight:600">${esc(sh.err)}</p>`:''}
+      <button class="btn hot" type="button" data-act="packPay" data-a="${p.id}" ${sh.busy?'disabled':''}>${sh.busy?L('Opening payment…','Ouverture du paiement…'):L(`Pay ${eur(p.cents)}`,`Payer ${eur(p.cents)}`)}</button>
+      <p class="tiny">${L('By paying you accept the','En payant, tu acceptes les')} <button class="btn sm ghost" type="button" data-act="cgv" style="padding:0 4px">${L('terms of sale','conditions de vente')}</button>.</p>`;
+  }
+  if(sh.type==='cgv'){
+    const seller=CFG.seller||L('[to complete: name, legal status, SIRET, address]','[à compléter : nom, statut, SIRET, adresse]'),mail=CFG.contact||'—';
+    const li=a=>a.map(([t,d])=>`<li style="margin:0 0 8px"><b>${t}</b> ${d}</li>`).join('');
+    return `<div class="modal-h"><div><h2>${L('Terms of sale','Conditions de vente')}</h2><p>${L('Gems and cosmetics in RYVO.','Gemmes et cosmétiques RYVO.')}</p></div>${closeBtn}</div>
+      <ol class="tiny" style="padding-left:18px;max-height:52vh;overflow:auto">${li([
+        [L('Seller.','Vendeur.'),esc(seller)+' · '+esc(mail)],
+        [L('What you buy.','Ce que tu achètes.'),L('Gems: a virtual currency usable only in RYVO to unlock cosmetic items (avatars, frames, themes) or League+. They give no in-game advantage, cannot be exchanged for money, resold or transferred.','Des gemmes : une monnaie virtuelle utilisable uniquement dans RYVO pour débloquer des objets esthétiques (avatars, cadres, thèmes) ou une Ligue+. Elles ne donnent aucun avantage en jeu et ne peuvent être ni échangées contre de l’argent, ni revendues, ni transférées.')],
+        [L('Prices.','Prix.'),L('In euros, VAT included, shown before payment. Card payment handled by Stripe; RYVO never receives your card details.','En euros TTC, affichés avant le paiement. Paiement par carte géré par Stripe ; RYVO ne reçoit jamais tes données de carte.')],
+        [L('Delivery.','Livraison.'),L('Immediately after payment is confirmed, usually within seconds, on the account used to buy.','Immédiatement après la confirmation du paiement, en général en quelques secondes, sur le compte qui a acheté.')],
+        [L('Withdrawal.','Rétractation.'),L('Because delivery is immediate at your express request, you waive your right of withdrawal (French Consumer Code, art. L221-28 13°).','La livraison étant immédiate à ta demande expresse, tu renonces à ton droit de rétractation (Code de la consommation, art. L221-28 13°).')],
+        [L('Minors.','Mineurs.'),L('If you are under 18, you need a parent’s permission to buy.','Si tu as moins de 18 ans, il te faut l’accord d’un parent pour acheter.')],
+        [L('Problems.','Problème.'),L('Gems not received or a charge you don’t recognise: write to the contact address with the payment date.','Gemmes non reçues ou paiement inconnu : écris à l’adresse de contact avec la date du paiement.')],
+        [L('Account.','Compte.'),L('Unused gems and items are lost if you delete your account or if it is banned for cheating.','Les gemmes et objets non utilisés sont perdus si tu supprimes ton compte ou s’il est banni pour triche.')]])}</ol>`;
+  }
+  return closeBtn;
+}
+/* ========================= ligues (version démo) ========================= */
+VIEWS.leagues=()=>`<div class="page-h"><div><p class="eyebrow">${L('Leagues','Ligues')}</p><h1>${L('Your own league','Ta propre ligue')}</h1><p>${L('Create a league for your group: friends, class, club. Rankings use your real runs.','Crée une ligue pour ton groupe : amis, promo, asso, club. Le classement se fait sur vos vraies parties.')}</p></div></div>
+  <div class="empty"><b>${L('Leagues need the online version','Les ligues demandent la version en ligne')}</b>${L('Everyone in a league must have an account so the server can check the scores.','Chaque membre doit avoir un compte pour que le serveur vérifie les scores.')}</div>`;
 
 VIEWS.tech=()=>{
   const li=(a,i)=>a.map(x=>`<li>${ic(i,16)}<span>${x}</span></li>`).join('');
@@ -618,7 +618,7 @@ function renderLayer0(){
       <ul class="hist">${list.map(p=>`<li>${avP(p,36)}<span class="t"><b class="row" style="gap:8px;flex-wrap:nowrap"><span class="presence${online(p)?' on':''}"></span>${esc(p.name)}</b><small>${p.rating} SR · ${online(p)?L('online','en ligne'):L('offline','hors ligne')}</small></span><button class="btn sm primary" type="button" data-act="challenge" data-a="${p.id}">${L('Pick','Choisir')}</button></li>`).join('')}</ul>`;
   }else if(sh.type==='more'){
     body=`<div class="modal-h"><h2>${L('More','Plus')}</h2>${closeBtn}</div>
-      <nav class="nav">${NAV.filter(n=>n&&['profile','campus','plans','admin','tech'].includes(n[0])).map(n=>`<button type="button" data-act="go" data-a="${n[0]}">${ic(n[1])}${n[2]()}</button>`).join('')}</nav>
+      <nav class="nav">${NAV.filter(n=>n&&['shop','social','campus','profile','tech'].includes(n[0])).map(n=>`<button type="button" data-act="go" data-a="${n[0]}">${ic(n[1])}${n[2]()}</button>`).join('')}</nav>
       <div class="row"><div class="lang" role="group" aria-label="${L('Language','Langue')}"><button type="button" data-act="lang" data-a="fr" aria-pressed="${LANG==='fr'}">Français</button><button type="button" data-act="lang" data-a="en" aria-pressed="${LANG==='en'}">English</button></div>
       ${S.data.account.signedIn?'':`<button class="btn sm primary" type="button" data-act="auth" data-a="signup">${L('Sign in','Connexion')}</button>`}</div>`;
   }else if(sh.type==='share'){
@@ -634,6 +634,8 @@ function renderLayer0(){
   }else if(sh.type==='report')body=reportHTML(sh);
   else if(sh.type==='auth')body=authHTML(sh);
   else if(sh.type==='campus')body=campusSheetHTML();
+  else if(['itemBuy','packBuy','cgv'].includes(sh.type))body=shopSheetHTML(sh,closeBtn);
+  else if(sh.type==='league'&&typeof leagueSheetHTML==='function')body=leagueSheetHTML(sh,closeBtn);
   Ly.innerHTML=`<div class="layer" data-act="scrim"><div class="modal" role="dialog" aria-modal="true">${body}</div></div>`;
   const f=Ly.querySelector('input:not([readonly]),.modal button.btn.primary');if(f&&Ly._fresh)setTimeout(()=>{const ae=document.activeElement;if(Ly.contains(f)&&!(ae&&ae!==f&&Ly.contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))try{f.focus();}catch(e){}},30);
 }

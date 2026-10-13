@@ -52,6 +52,10 @@ const ACT={
   verif:async a=>{const [id,w]=a.split(':');try{await act('admin_verif_action',{p_id:id,p_action:w},w==='ok'?'Étudiant vérifié.':'Demande refusée.');loadSection();}catch(e){}},
   mgrDel:async a=>{try{await act('admin_manager',{p_action:'remove',p:{id:a}},'Responsable retiré.');loadSection();}catch(e){}},
   schoolEdit:a=>openLayer({type:'school',id:a||null}),
+  payResolve:async a=>{try{await act('admin_purchase_resolve',{p_id:a},'Paiement marqué comme traité.');loadSection();}catch(e){}},
+  itemSave:async a=>{try{await act('admin_save_item',{p:{id:a,price:+$('#ip_'+CSS.escape(a)).value,active:$('#ia_'+CSS.escape(a)).checked}},'Article enregistré.');loadSection();}catch(e){}},
+  packSave:async a=>{try{await act('admin_save_pack',{p:{id:a,gems:+$('#pg_'+a).value,cents:Math.round(parseFloat($('#pc_'+a).value)*100)}},'Pack enregistré.');loadSection();}catch(e){}},
+  askLgDel:a=>{const l=S.d.leagues.rows.find(x=>x.id===a);confirmBox({kind:'lgDel',lid:a,title:`Supprimer la ligue « ${l.name} » ?`,body:`Elle disparaît pour ses ${l.members} joueur${l.members>1?'s':''}. Leurs scores restent.`,ok:'Supprimer',danger:true});},
   askSchoolMerge:a=>{const s=S.d.schools.schools.find(x=>x.id===a);confirmBox({kind:'schoolMerge',sid:a,title:`Fusionner « ${s.name} » (${s.city}) ?`,body:`Ses ${s.players} joueur${s.players>1?'s':''}, demandes de badge et compétitions passent sur l’école choisie ci-dessous, puis « ${s.name} » est supprimée. Irréversible.`,ok:'Fusionner',danger:true});},
   askSchoolDel:a=>{const s=S.d.schools.schools.find(x=>x.id===a);confirmBox({kind:'schoolDel',sid:a,title:`Supprimer « ${s.name} » ?`,body:s.players?`Ses ${s.players} joueur${s.players>1?'s':''} n’auront plus d’école et devront en choisir une autre. Pour un doublon, préfère « Fusionner ».`:'Aucun joueur n’est rattaché à cette école.',ok:'Supprimer',danger:true,word:s.players?'supprimer':null});},
   inv:async a=>{const [w,id]=a.split(/:(.+)/);try{await act('admin_invoice',{p_action:w,p:{id}},w==='paid'?'Facture marquée payée.':'Relance notée au journal.');loadSection();}catch(e){}},
@@ -67,6 +71,7 @@ const ACT={
       if(c.kind==='qDel')await act('admin_question_action',{p_id:c.qid,p_action:'delete'},'Question supprimée.');
       if(c.kind==='compCancel')await act('admin_comp_action',{p_id:c.cid,p_action:'cancel'},'Compétition annulée.');
       if(c.kind==='seasonClose')await act('admin_season_action',{p_action:'close'},'Nouvelle saison lancée.');
+      if(c.kind==='lgDel')await act('admin_delete_league',{p_id:c.lid},'Ligue supprimée.');
       if(c.kind==='schoolMerge')await act('admin_merge_school',{p_from:c.sid,p_into:$('#cfInto').value},'Écoles fusionnées.');
       if(c.kind==='schoolDel')await act('admin_delete_school',{p_id:c.sid},'École supprimée.');
       if(c.kind==='removeAdmin')S.d.team=await act('admin_team_action',{p_action:'remove',p:{id:c.uid}},'Membre retiré.');
@@ -129,6 +134,9 @@ document.addEventListener('submit',async e=>{
       closeLayer();toast('Établissement enregistré.');loadSection();
     }
     if(k==='mgr'){await act('admin_manager',{p_action:'add',p:{name:F('name'),email:F('mail'),school:F('school'),role:F('role')}},'Responsable ajouté.');loadSection();}
+    if(k==='shopSet'){await act('admin_shop_settings',{p:{ad_gems:+F('ad_gems'),ad_per_day:+F('ad_per_day'),ad_gap_s:+F('ad_gap_s'),league_plus_gems:+F('league_plus_gems')}},'Réglages enregistrés.');loadSection();}
+    if(k==='grant'){const r=await act('admin_grant_gems',{p_user:F('user'),p_delta:+F('n'),p_reason:F('reason')},'Opération enregistrée.');toast('Nouveau solde : '+fmt(r.balance)+' gemmes.');loadSection();}
+    if(k==='lgSearch'){S.ui.lgq=F('q');loadSection();}
     if(k==='invoice'){await act('admin_invoice',{p_action:'add',p:{client:F('client'),type:F('type'),amount:+F('amount'),due:F('due')}},'Facture créée.');loadSection();}
     if(k==='sponsor'){await act('admin_sponsor',{p:{name:F('name'),contract:F('contract'),period:F('period'),amount:+F('amount')||0,status:F('status')}},'Sponsor ajouté.');loadSection();}
     if(k==='admin'){S.d.team=await act('admin_team_action',{p_action:'invite',p:{mail:F('mail'),role:F('role')}},'Invitation créée. Préviens la personne.');loadSection();}

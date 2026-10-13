@@ -2,7 +2,7 @@
 /* ========================= chrome ========================= */
 function railHTML(){
   if(S.auth.stage!=='ready')return `<div class="logo">${LOGO}<span>RYVO<small>CONSOLE ADMIN</small></span></div>`;
-  const c=S.counts||{},cnt={moderation:c.reports,anticheat:c.flags,schools:c.verifs,business:c.late,content:c.drafts};
+  const c=S.counts||{},cnt={moderation:c.reports,anticheat:c.flags,schools:c.verifs,shop:c.shop,content:c.drafts};
   let grp=null,h=`<div class="logo">${LOGO}<span>RYVO<small>CONSOLE ADMIN</small></span></div><nav class="nav" aria-label="Sections">`;
   SECTIONS.forEach(s=>{if(!can(s[0]))return;if(s[4]!==grp){grp=s[4];if(grp)h+=`<div class="grp">${grp}</div>`;}
     h+=`<button type="button" data-act="sec" data-a="${s[0]}" ${S.ui.sec===s[0]?'aria-current="page"':''}>${ic(s[2])}${s[1]}${cnt[s[0]]?`<span class="cnt">${cnt[s[0]]}</span>`:''}</button>`;});
@@ -37,7 +37,7 @@ V.overview=()=>{
   if(c.reports)q.push(['flag','bad',`${c.reports} signalement${c.reports>1?'s':''} ouvert${c.reports>1?'s':''}`,'Pseudos, triche, usurpation','moderation']);
   if(c.flags)q.push(['shield','',`${c.flags} score${c.flags>1?'s':''} suspect${c.flags>1?'s':''}`,'Détectés par les règles anti-triche','anticheat']);
   if(c.verifs)q.push(['campus','brand',`${c.verifs} vérification${c.verifs>1?'s':''} d’école`,'Étudiants en attente de badge','schools']);
-  if(c.late)q.push(['euro','bad',`${c.late} facture${c.late>1?'s':''} en retard`,'À relancer','business']);
+  if(c.shop)q.push(['euro','bad',`${c.shop} paiement${c.shop>1?'s':''} à vérifier`,'Montant inattendu : rien n’a été crédité','shop']);
   if(c.drafts)q.push(['book','good',`${c.drafts} question${c.drafts>1?'s':''} en brouillon`,'À relire et publier','content']);
   const vq=q.filter(x=>can(x[4]));
   return head('Vue d’ensemble','Bonjour '+esc((S.me||{}).name||''),'Ce qui demande une décision, puis l’état de la plateforme. Données réelles.')+`
@@ -45,7 +45,7 @@ V.overview=()=>{
     <div class="kpi"><small>Joueurs inscrits</small><b>${fmt(o.players)}</b><span class="d">${o.new7} cette semaine</span></div>
     <div class="kpi"><small>Actifs · 7 jours</small><b>${fmt(o.active7)}</b><span class="d">${o.players?Math.round(o.active7/o.players*100):0} % des inscrits</span></div>
     <div class="kpi"><small>Actifs · 30 jours</small><b>${fmt(o.active30)}</b><span class="d">${o.verified} étudiants vérifiés</span></div>
-    <div class="kpi"><small>Abonnés Plus</small><b>${fmt(o.plus)}</b><span class="d">${eur(o.plus*(o.plus_price||0))} / mois</span></div>
+    <div class="kpi"><small>Boutique ce mois-ci</small><b>${(o.shop_month/100).toLocaleString('fr-FR',{style:'currency',currency:'EUR'})}</b><span class="d">${fmt(o.buyers)} acheteur${o.buyers>1?'s':''} au total</span></div>
     <div class="kpi ${vq.length?'alert':''}"><small>Décisions en attente</small><b>${(c.reports||0)+(c.flags||0)+(c.verifs||0)}</b><span class="d">modération, triche, écoles</span></div>
   </div>
   <div class="grid">
@@ -224,15 +224,15 @@ V.competitions=()=>{
     <p class="tiny">Clôturer fige la saison et ramène chaque cote à mi-chemin de 1 000.</p></section>
     <section class="card c6"><h2>Saisons passées</h2>${d.past.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Saison</th><th>Clôturée le</th><th class="num">Joueurs classés</th></tr></thead><tbody>${d.past.slice().reverse().map(p=>`<tr><td>Saison ${p.n}</td><td>${dLong(p.end)}</td><td class="num">${fmt(p.players||0)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><b>Aucune saison clôturée</b></div>'}</section></div>`;}
   return top+`<div class="row" style="justify-content:flex-end;margin-bottom:12px"><button class="btn primary" type="button" data-act="compNew">${ic('plus',15)}Créer une compétition</button></div>
-  ${d.comps.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Compétition</th><th>Jeu</th><th>Format</th><th>Dates</th><th>Ouverte à</th><th>Sponsor</th><th class="num">Participants</th><th>Statut</th><th></th></tr></thead><tbody>
+  ${d.comps.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Compétition</th><th>Jeu</th><th>Format</th><th>Dates</th><th>Ouverte à</th><th class="num">Participants</th><th>Statut</th><th></th></tr></thead><tbody>
   ${d.comps.map(c=>{const st=compStatus(c),sp=d.sponsors.find(s=>s.id===c.sponsor),sch=c.school==='all'?'Toutes les écoles':((d.schools.find(s=>s.id===c.school)||{}).short||'—');return `<tr><td><b>${esc(c.name)}</b><span class="sub">${esc(c.reward)}</span></td><td>${GM(c.game).name}</td><td>${FORMATS[c.format]}</td><td>${dShort(c.start)} → ${dShort(c.end)}</td>
-    <td>${c.vis==='public'?'Publique':'Privée'} · ${esc(sch)}</td><td>${sp?esc(sp.name)+' <span class="badge">sponsorisé</span>':'—'}</td><td class="num">${fmt(c.players)}</td><td><span class="badge ${st[1]}">${st[0]}</span></td>
+    <td>${c.vis==='public'?'Publique':'Privée'} · ${esc(sch)}</td><td class="num">${fmt(c.players)}</td><td><span class="badge ${st[1]}">${st[0]}</span></td>
     <td class="act">${st[0]==='À venir'?`<button class="btn sm ghost" type="button" data-act="askCompCancel" data-a="${c.id}">Annuler</button>`:''}<button class="btn sm ghost" type="button" data-act="compAct" data-a="${c.id}:dup" aria-label="Dupliquer">${ic('copy',15)}</button></td></tr>`;}).join('')}
-  </tbody></table></div>`:'<div class="empty"><b>Aucune compétition</b>Crée la première pour un campus ou un sponsor.</div>'}`;
+  </tbody></table></div>`:'<div class="empty"><b>Aucune compétition</b>Crée la première, pour tous les joueurs ou une école.</div>'}`;
 };
 function compForm(){
   const e=S.ui.layer.err,v=S.ui.layer.vals||{},d=S.d.comps,in7=new Date(Date.now()+7*DAY).toISOString().slice(0,10),in8=new Date(Date.now()+8*DAY).toISOString().slice(0,10);
-  return `<div class="m-h"><div><h2>Créer une compétition</h2><p>Les lots sont offerts par RYVO ou un sponsor. Pas d’inscription payante avec gains en argent.</p></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
+  return `<div class="m-h"><div><h2>Créer une compétition</h2><p>Les lots sont offerts par RYVO. Pas d’inscription payante avec gains en argent.</p></div><button class="x" type="button" data-act="close" aria-label="Fermer">${ic('x')}</button></div>
   <form data-form="comp" class="stack" novalidate><div class="fgrid">
     <div class="field full"><label for="cfName">Nom</label><input class="input" id="cfName" name="name" maxlength="60" value="${esc(v.name||'')}" placeholder="ex. Coupe Skyline du BDE"></div>
     <div class="field"><label for="cfGame">Jeu</label><select class="input" id="cfGame" name="game">${GAMES0.filter(g=>!g.dev).map(g=>`<option value="${g.id}" ${v.game===g.id?'selected':''}>${g.name}</option>`).join('')}</select></div>
@@ -241,7 +241,6 @@ function compForm(){
     <div class="field"><label for="cfEnd">Fin</label><input class="input" type="date" id="cfEnd" name="end" value="${v.end||in8}"></div>
     <div class="field"><label for="cfVis">Visibilité</label><select class="input" id="cfVis" name="vis"><option value="private">Privée</option><option value="public" ${v.vis==='public'?'selected':''}>Publique</option></select></div>
     <div class="field"><label for="cfSch">Écoles</label><select class="input" id="cfSch" name="school"><option value="all">Toutes les écoles</option>${d.schools.map(s=>`<option value="${s.id}" ${v.school===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
-    <div class="field"><label for="cfSp">Sponsor</label><select class="input" id="cfSp" name="sponsor"><option value="">Aucun</option>${d.sponsors.map(s=>`<option value="${s.id}" ${v.sponsor===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
     <div class="field"><label for="cfRw">Récompense</label><input class="input" id="cfRw" name="reward" maxlength="80" value="${esc(v.reward||'')}" placeholder="ex. Cadre exclusif + goodies"></div>
   </div>${e?`<div class="empty" style="border-color:var(--bad);background:var(--bad-soft);padding:12px">${esc(e)}</div>`:''}<div class="row"><button class="btn primary" type="submit">Créer</button><button class="btn ghost" type="button" data-act="close">Annuler</button></div></form>`;
 }
@@ -249,7 +248,7 @@ function compForm(){
 /* ========================= schools ========================= */
 V.schools=()=>{
   const t=S.ui.sc,d=S.d.schools,c=S.counts||{};
-  const top=head('Partenaires','Écoles','Établissements, demandes de vérification et responsables de campus.',tabs(t,'scTab',[['list','Établissements',d?d.schools.length:null],['verifs','Vérifications',c.verifs],['managers','Responsables',d?d.managers.length:null]]));
+  const top=head('Produit','Écoles','Établissements ajoutés par les joueurs et demandes de badge vérifié.',tabs(t,'scTab',[['list','Établissements',d?d.schools.length:null],['verifs','Vérifications',c.verifs]]));
   if(!d)return top+loading();
   if(t==='verifs')return top+`<p class="tiny" style="margin-bottom:10px">${ic('info',14)} Une adresse de l’école ne prouve pas à elle seule l’inscription (anciens élèves, personnel). En cas de doute, demande une confirmation à l’école avant d’approuver.</p>`+(d.verifs.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Étudiant</th><th>École</th><th>Adresse</th><th>Domaine</th><th>Envoyée</th><th></th></tr></thead><tbody>
     ${d.verifs.map(v=>{const s=d.schools.find(x=>x.id===v.school);return `<tr><td><button class="btn sm ghost" type="button" data-act="player" data-a="${v.player.id}" style="padding:0 4px">${pav(v.player,24)} ${esc(v.player.name)}</button></td><td>${esc(s?s.short:'—')}</td><td class="mono">${esc(v.local)}@${esc(v.domain)}</td>
@@ -284,45 +283,65 @@ function schoolForm(id){
   </div>${e?`<div class="empty" style="border-color:var(--bad);background:var(--bad-soft);padding:12px">${esc(e)}</div>`:''}<div class="row"><button class="btn primary" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-act="close">Annuler</button></div></form>`;
 }
 
-/* ========================= business ========================= */
-V.business=()=>{
-  const d=S.d.biz;if(!d)return head('Partenaires','Revenus','')+loading();
-  const mrr=d.subs*d.plus_price,inv=d.invoices,paid=inv.filter(i=>i.status==='paid').reduce((s,i)=>s+Number(i.amount),0),due=inv.filter(i=>i.status!=='paid').reduce((s,i)=>s+Number(i.amount),0);
-  const SER=[['plus','Abonnements Plus','#5B4BFF'],['campus','Licences campus','#FFC93C'],['events','Événements & team building','#14B37A'],['sponsors','Sponsors','#FF6B3D']];
-  const rev=d.rev||[],tot=rev.map(r=>SER.reduce((s,x)=>s+Number(r[x[0]]||0),0)),max=Math.max(100,Math.ceil(Math.max(...tot,0)/100)*100);
-  const W=640,H=220,pl=56,pr=10,pt=12,pb=26,y=v=>pt+(H-pt-pb)*(1-v/max),bw=(W-pl-pr)/Math.max(1,rev.length);
-  const chart=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Revenus par mois et par source, sur 6 mois" style="width:100%;height:auto">
-    <g class="gl">${[0,max/2,max].map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}"/><text x="${pl-6}" y="${y(t)+3}" text-anchor="end">${fmt(t)} €</text>`).join('')}</g>
-    ${rev.map((r,i)=>{let acc=0;return SER.map(([k,,c])=>{const v=Number(r[k]||0);if(!v)return '';const y0=y(acc),y1=y(acc+v);acc+=v;return `<rect x="${pl+i*bw+10}" y="${y1}" width="${bw-20}" height="${y0-y1}" fill="${c}" stroke="#17142A" stroke-width="1.5"/>`;}).join('')+`<text x="${pl+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${new Date(r.m).toLocaleDateString('fr-FR',{month:'short'})}</text>${tot[i]?`<text x="${pl+i*bw+bw/2}" y="${y(tot[i])-5}" text-anchor="middle" style="fill:#17142A;font-weight:700">${fmt(tot[i])}</text>`:''}`;}).join('')}</svg>`;
-  const ist={paid:['Payée','good'],pending:['En attente',''],late:['En retard','bad']};
-  return head('Partenaires','Revenus','Encaissements par source. Les abonnements Plus apparaîtront quand le paiement sera branché.')+`
+/* ========================= boutique ========================= */
+const euc=c=>(Number(c)/100).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
+const PST={paid:['Payé','good'],mismatch:['À vérifier','bad'],refunded:['Remboursé','']};
+V.shop=()=>{
+  const d=S.d.shop;if(!d)return head('Revenus','Boutique','')+loading();
+  const k=d.kpi,sup=S.role==='super',st=d.settings||{};
+  const m=d.months||[],max=Math.max(1000,...m.map(x=>Number(x.cents))),W=640,H=200,pl=60,pr=10,pt=12,pb=26,y=v=>pt+(H-pt-pb)*(1-v/max),bw=(W-pl-pr)/Math.max(1,m.length);
+  const chart=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ventes par mois sur 6 mois" style="width:100%;height:auto">
+    <g class="gl">${[0,max/2,max].map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}"/><text x="${pl-6}" y="${y(t)+3}" text-anchor="end">${euc(t)}</text>`).join('')}</g>
+    ${m.map((x,i)=>`<rect x="${pl+i*bw+12}" y="${y(Number(x.cents))}" width="${bw-24}" height="${Math.max(0,y(0)-y(Number(x.cents)))}" rx="4" fill="#5B4BFF"><title>${euc(x.cents)}</title></rect><text x="${pl+i*bw+bw/2}" y="${H-8}" text-anchor="middle">${new Date(x.m).toLocaleDateString('fr-FR',{month:'short'})}</text>`).join('')}</svg>`;
+  const KIND={avatar:'Avatar',frame:'Cadre',skin:'Thème'};
+  return head('Revenus','Boutique','Gemmes achetées par carte (Stripe), objets cosmétiques, pubs récompensées. Tout ce qui se vend est esthétique.')+`
   <div class="kpis" style="margin-bottom:16px">
-    <div class="kpi"><small>Abonnements Plus / mois</small><b>${eur(mrr)}</b><span class="d">${d.subs} abonnés</span></div>
-    <div class="kpi"><small>Encaissé (factures)</small><b>${eur(paid)}</b><span class="d">${inv.filter(i=>i.status==='paid').length} factures payées</span></div>
-    <div class="kpi ${inv.some(i=>i.status==='late')?'alert':''}"><small>À encaisser</small><b>${eur(due)}</b><span class="d">${inv.filter(i=>i.status==='late').length} en retard</span></div>
-    <div class="kpi"><small>Sponsors</small><b>${d.sponsors.length}</b><span class="d">${d.sponsors.filter(s=>s.status==='Signé').length} signés</span></div>
+    <div class="kpi"><small>Ventes ce mois-ci</small><b>${euc(k.month_cents)}</b><span class="d">Total : ${euc(k.total_cents)}</span></div>
+    <div class="kpi"><small>Acheteurs</small><b>${fmt(k.buyers)}</b><span class="d">${fmt(k.orders)} paiement${k.orders>1?'s':''} · ${fmt(k.refunds)} remboursé${k.refunds>1?'s':''}</span></div>
+    <div class="kpi"><small>Objets débloqués</small><b>${fmt(k.items_sold)}</b><span class="d">${fmt(k.leagues_plus)} Ligue+</span></div>
+    <div class="kpi"><small>Pubs regardées</small><b>${fmt(k.ads_today)}</b><span class="d">aujourd’hui · ${fmt(k.ads_7d)} sur 7 jours</span></div>
+    <div class="kpi"><small>Gemmes en circulation</small><b>${fmt(k.gems_out)}</b><span class="d">non dépensées</span></div>
   </div>
   <div class="grid">
-    <section class="card c12"><div class="card-h"><h2>Revenus par mois</h2><div class="legend">${SER.map(s=>`<span><i style="background:${s[2]}"></i>${s[1]}</span>`).join('')}</div></div>${chart}</section>
-    <section class="c8"><div class="card-h" style="margin-bottom:10px"><h2>Factures</h2></div>${inv.length?`<div class="tblw"><table class="tbl"><thead><tr><th>N°</th><th>Client</th><th>Type</th><th class="num">Montant</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody>
-      ${inv.map(i=>`<tr><td class="mono">${esc(i.id)}</td><td><b>${esc(i.client)}</b></td><td>${esc(i.type)}</td><td class="num">${eur(i.amount)}</td><td>${dShort(i.due)}</td><td><span class="badge ${ist[i.status][1]}">${ist[i.status][0]}</span></td>
-        <td class="act">${i.status!=='paid'?`<button class="btn sm" type="button" data-act="inv" data-a="paid:${i.id}">Marquer payée</button>${i.status==='late'?` <button class="btn sm sun" type="button" data-act="inv" data-a="remind:${i.id}">Noter une relance</button>`:''}`:''}</td></tr>`).join('')}
-    </tbody></table></div>`:'<div class="empty"><b>Aucune facture</b></div>'}</section>
-    <section class="card c4"><h2>Nouvelle facture</h2><form data-form="invoice" class="stack" novalidate>
-      <div class="field"><label for="ivC">Client</label><input class="input" id="ivC" name="client" maxlength="80"></div>
-      <div class="field"><label for="ivT">Type</label><select class="input" id="ivT" name="type"><option>Licence campus</option><option>Événement BDE</option><option>Team building</option><option>Sponsoring</option></select></div>
-      <div class="fgrid"><div class="field"><label for="ivA">Montant (€)</label><input class="input" id="ivA" name="amount" type="number" min="1" step="1"></div><div class="field"><label for="ivD">Échéance</label><input class="input" id="ivD" name="due" type="date" value="${new Date(Date.now()+30*DAY).toISOString().slice(0,10)}"></div></div>
-      <button class="btn primary" type="submit">Créer</button><p class="tiny">Suivi interne. La facture légale reste à émettre depuis ton outil de facturation.</p></form></section>
-    <section class="c8"><div class="card-h" style="margin-bottom:10px"><h2>Sponsors</h2></div>${d.sponsors.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Marque</th><th>Contrat</th><th>Période</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>
-      ${d.sponsors.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.contract)}</td><td>${esc(s.period)}</td><td class="num">${eur(s.amount)}</td><td><span class="badge ${s.status==='Signé'?'good':'warn'}">${esc(s.status)}</span></td></tr>`).join('')}
-    </tbody></table></div>`:'<div class="empty"><b>Aucun sponsor</b></div>'}</section>
-    <section class="card c4"><h2>Nouveau sponsor</h2><form data-form="sponsor" class="stack" novalidate>
-      <div class="field"><label for="spN">Marque</label><input class="input" id="spN" name="name" maxlength="60"></div>
-      <div class="field"><label for="spC">Contrat</label><input class="input" id="spC" name="contract" maxlength="80" placeholder="ex. Tournoi de rentrée"></div>
-      <div class="fgrid"><div class="field"><label for="spP">Période</label><input class="input" id="spP" name="period" maxlength="40"></div><div class="field"><label for="spA">Montant (€)</label><input class="input" id="spA" name="amount" type="number" min="0" step="1"></div></div>
-      <div class="field"><label for="spS">Statut</label><select class="input" id="spS" name="status"><option>En négociation</option><option>Signé</option></select></div>
-      <button class="btn primary" type="submit">Ajouter</button></form></section>
+    <section class="card c7"><div class="card-h"><h2>Ventes par mois</h2><span class="tiny">TTC, avant frais Stripe</span></div>${chart}</section>
+    <section class="card c5"><div class="card-h"><h2>Mise en route</h2></div><ul class="list">
+      <li>${ic('check',15)}<span><b>Stripe</b> : crée le compte, puis déploie la fonction « payments » (README, « Encaisser les achats »).</span></li>
+      <li>${ic('check',15)}<span><b>config.js</b> : <span class="mono">seller</span> (tes infos de vendeur) et <span class="mono">payments: true</span>. Sans ça, les packs restent visibles mais non achetables.</span></li>
+      <li>${ic('check',15)}<span><b>Pubs</b> : <span class="mono">ads: { client: 'ca-pub-…' }</span> après validation par Google AdSense.</span></li></ul></section>
+    <section class="c12"><div class="card-h" style="margin-bottom:10px"><h2>Derniers paiements</h2></div>${d.purchases.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Date</th><th>Joueur</th><th>Pack</th><th class="num">Montant</th><th class="num">Gemmes</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${d.purchases.map(p=>{const s=PST[p.status]||['?',''];return `<tr><td>${dShort(p.t)}</td><td>${p.player&&p.player.id?`<button class="btn sm ghost" type="button" data-act="player" data-a="${p.player.id}" style="padding:0 4px">${esc(p.player.name)}</button>`:'—'}</td><td class="mono">${esc(p.pack||'—')}</td><td class="num">${euc(p.cents)}</td><td class="num">${fmt(p.gems)}</td>
+        <td><span class="badge ${p.resolved?'':s[1]}">${p.status==='mismatch'&&p.resolved?'Traité':s[0]}</span></td><td class="act">${p.status==='mismatch'&&!p.resolved?`<button class="btn sm" type="button" data-act="payResolve" data-a="${p.id}">Marquer traité</button>`:''}</td></tr>`;}).join('')}
+    </tbody></table></div><p class="tiny" style="margin-top:8px">« À vérifier » : le montant reçu ne correspond à aucun pack (prix changé pendant le paiement…). Rien n’a été crédité : crédite à la main ci-dessous ou rembourse depuis Stripe.</p>`:'<div class="empty"><b>Aucun paiement pour l’instant</b>Ils apparaîtront ici dès le premier achat.</div>'}</section>
+    <section class="c7"><div class="card-h" style="margin-bottom:10px"><h2>Articles</h2><span class="tiny">Prix en gemmes</span></div><div class="tblw"><table class="tbl"><thead><tr><th>Article</th><th>Type</th><th class="num">Possédé par</th><th>Prix</th><th>En vente</th><th></th></tr></thead><tbody>
+      ${d.items.map(i=>`<tr><td><b>${esc(i.fr)}</b></td><td>${KIND[i.kind]||i.kind}</td><td class="num">${fmt(i.owners)}</td><td><input class="input" id="ip_${esc(i.id)}" type="number" min="1" max="100000" value="${i.price}" style="width:90px;height:36px"></td><td><input type="checkbox" id="ia_${esc(i.id)}" ${i.active?'checked':''} aria-label="En vente"></td><td class="act"><button class="btn sm" type="button" data-act="itemSave" data-a="${esc(i.id)}">Enregistrer</button></td></tr>`).join('')}
+    </tbody></table></div></section>
+    <section class="card c5"><h2>Packs de gemmes</h2>${sup?'':'<p class="tiny">Modifiable par un Super admin.</p>'}
+      ${d.packs.map(p=>`<div class="row" style="align-items:flex-end;flex-wrap:nowrap;margin-top:8px"><div class="field" style="flex:1"><label for="pg_${p.id}">Gemmes</label><input class="input" id="pg_${p.id}" type="number" min="1" value="${p.gems}" ${sup?'':'disabled'}></div><div class="field" style="flex:1"><label for="pc_${p.id}">Prix (€)</label><input class="input" id="pc_${p.id}" type="number" min="0.5" step="0.01" value="${(p.cents/100).toFixed(2)}" ${sup?'':'disabled'}></div>${sup?`<button class="btn sm" type="button" data-act="packSave" data-a="${p.id}">OK</button>`:''}</div>`).join('')}
+      <p class="tiny">Changer un prix n’affecte que les paiements suivants.</p>
+      <h2 style="margin-top:16px">Réglages</h2>
+      <form data-form="shopSet" class="stack" novalidate><div class="fgrid">
+        <div class="field"><label for="ss1">Gemmes par pub</label><input class="input" id="ss1" name="ad_gems" type="number" min="0" max="100" value="${st.ad_gems}" ${sup?'':'disabled'}></div>
+        <div class="field"><label for="ss2">Pubs max / jour</label><input class="input" id="ss2" name="ad_per_day" type="number" min="0" max="20" value="${st.ad_per_day}" ${sup?'':'disabled'}></div>
+        <div class="field"><label for="ss3">Délai entre 2 pubs (s)</label><input class="input" id="ss3" name="ad_gap_s" type="number" min="15" max="3600" value="${st.ad_gap_s}" ${sup?'':'disabled'}></div>
+        <div class="field"><label for="ss4">Prix Ligue+ (gemmes)</label><input class="input" id="ss4" name="league_plus_gems" type="number" min="1" value="${st.league_plus_gems}" ${sup?'':'disabled'}></div></div>
+        ${sup?'<button class="btn" type="submit">Enregistrer les réglages</button>':''}</form></section>
+    ${sup?`<section class="card c12"><h2>Créditer ou retirer des gemmes</h2><form data-form="grant" class="row" novalidate style="align-items:flex-end">
+      <div class="field" style="flex:1;min-width:150px"><label for="grU">Pseudo</label><input class="input" id="grU" name="user" maxlength="16"></div>
+      <div class="field" style="width:130px"><label for="grN">Gemmes (+ ou −)</label><input class="input" id="grN" name="n" type="number" min="-10000" max="10000"></div>
+      <div class="field" style="flex:2;min-width:200px"><label for="grR">Motif (journal)</label><input class="input" id="grR" name="reason" maxlength="120" placeholder="ex. Paiement du 12/10 non crédité"></div>
+      <button class="btn primary" type="submit">Valider</button></form><p class="tiny">Pour le support uniquement. Chaque opération est tracée dans le journal.</p></section>`:''}
   </div>`;
+};
+/* ========================= ligues ========================= */
+V.leagues=()=>{
+  const d=S.d.leagues;if(!d)return head('Communauté','Ligues','')+loading();
+  return head('Communauté','Ligues','Ligues privées créées par les joueurs. Supprime celles dont le nom pose problème.')+`
+  <div class="kpis" style="margin-bottom:16px"><div class="kpi"><small>Ligues en cours</small><b>${fmt(d.active)}</b></div><div class="kpi"><small>Ligue+</small><b>${fmt(d.plus)}</b></div><div class="kpi"><small>Joueurs dans une ligue en cours</small><b>${fmt(d.members)}</b></div></div>
+  <form data-form="lgSearch" class="row" novalidate style="margin-bottom:12px"><input class="input" name="q" value="${esc(S.ui.lgq||'')}" placeholder="Nom, code ou pseudo du créateur" style="flex:1;min-width:200px"><button class="btn" type="submit">${ic('search',15)}Rechercher</button></form>
+  ${d.rows.length?`<div class="tblw"><table class="tbl"><thead><tr><th>Ligue</th><th>Jeu</th><th>Créateur</th><th class="num">Joueurs</th><th>Fin</th><th></th></tr></thead><tbody>
+  ${d.rows.map(l=>`<tr><td><b>${esc(l.name)}</b>${l.plus?' <span class="badge brand">Ligue+</span>':''}<span class="sub mono">${esc(l.code)} · créée ${ago(l.t)}</span></td><td>${esc(skLabel(l.sk))}</td><td><button class="btn sm ghost" type="button" data-act="player" data-a="${l.owner.id}" style="padding:0 4px">${esc(l.owner.name)}</button></td><td class="num">${l.members}/${l.max}</td><td>${l.ends<Date.now()?'<span class="badge">Terminée</span>':dShort(l.ends)}</td>
+    <td class="act"><button class="btn sm ghost" type="button" data-act="askLgDel" data-a="${l.id}" style="color:var(--bad)">Supprimer</button></td></tr>`).join('')}
+  </tbody></table></div>`:'<div class="empty"><b>Aucune ligue</b>Les joueurs créent leurs ligues depuis le jeu.</div>'}`;
 };
 
 /* ========================= team & audit ========================= */
