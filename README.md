@@ -25,7 +25,7 @@ Dans Supabase → **Authentication** :
 
 - **Sign In / Providers → Email** : activé, avec **Confirm email** activé.
 - **URL Configuration** :
-  - *Site URL* : `https://<ton-pseudo-github>.github.io/ryvo/`
+  - *Site URL* : `https://<ton-pseudo-github>.github.io/RYVO/` (avec le `/RYVO/` à la fin, sinon le lien de confirmation mène à une page 404)
   - *Redirect URLs* : ajoute `https://<ton-pseudo-github>.github.io/ryvo/**`
 - **Multi-Factor** : laisse **TOTP** activé (c'est le cas par défaut). La console admin l'exige.
 - **Emails** : le service d'e-mail fourni par Supabase est très limité (quelques e-mails par heure, et seulement vers les membres de l'équipe du projet). Avant d'ouvrir aux joueurs, branche un vrai service d'envoi dans **Authentication → Emails → SMTP Settings** (Brevo, Resend, Postmark… ont des offres gratuites).
@@ -71,6 +71,7 @@ Depuis la console : écoles (avec leur domaine e-mail, pour la vérification ét
 
 - **Aucun accès direct aux tables.** Toutes les tables ont la sécurité ligne par ligne (RLS) activée, sans aucune règle d'accès, et les droits sont retirés aux visiteurs. Le site ne peut appeler que des fonctions serveur précises.
 - **Chaque fonction vérifie qui appelle.** Les fonctions joueur exigent un compte connecté et actif (pas suspendu ni banni). Les fonctions admin vérifient le rôle (super, modération, contenu, partenariats) **et** la double authentification.
+- **Les invités peuvent jouer, mais rien n'est enregistré.** Sans compte, chaque jeu se lance en partie d'essai locale ; à la fin, la fenêtre d'inscription/connexion s'ouvre. Seules les parties lancées une fois connecté sont envoyées au serveur (une partie invité ne peut pas être « rattrapée » après coup, sinon n'importe qui pourrait inventer un score).
 - **Les scores sont calculés par le serveur.** Une partie classée commence par un ticket serveur (`start_run`). Pour le Quiz, chaque réponse est corrigée côté serveur ; pour Word Rush, chaque mot est vérifié côté serveur ; pour les autres jeux, le serveur contrôle la cohérence (durées, vitesses, records anormaux) et signale ou annule les parties suspectes (onglet **Anti-triche** de la console).
 - **Journal d'audit.** Chaque action admin est enregistrée et ne peut pas être effacée.
 - **Données personnelles.** Les e-mails sont masqués dans la console (affichage complet tracé dans le journal). Chaque joueur peut exporter ses données et supprimer son compte depuis son profil.
